@@ -725,6 +725,11 @@ export default function SlotMachine(props: {
         pauseDone = true;
         input.pause.onChange(false);
       }
+      // Skipping mid-stall must still end the stall, or Codex keeps "thinking" on the result.
+      if (input.pause && skipped && pauseUntil !== null && !pauseDone) {
+        pauseDone = true;
+        input.pause.onChange(false);
+      }
       const elapsed = skipped ? durationMs : time - start;
       if (input.showWin !== false && elapsed / durationMs >= nextPulse && nextPulse < 1) {
         nextPulse += 0.25;
