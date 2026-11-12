@@ -76,6 +76,20 @@ export function createSlotAudio(): SlotAudio {
   roomTone.frequency.value = 2800;
   room.connect(roomDelay).connect(roomTone).connect(roomFeedback).connect(roomDelay);
   roomTone.connect(master);
+  // A generated hall tail (decaying stereo noise) behind the room, so bells and brass bloom.
+  const hall = ctx.createConvolver();
+  const hallSeconds = 1.6;
+  const impulse = ctx.createBuffer(2, Math.floor(ctx.sampleRate * hallSeconds), ctx.sampleRate);
+  for (let channel = 0; channel < 2; channel++) {
+    const data = impulse.getChannelData(channel);
+    for (let index = 0; index < data.length; index++) {
+      data[index] = (Math.random() * 2 - 1) * (1 - index / data.length) ** 3.2;
+    }
+  }
+  hall.buffer = impulse;
+  const hallReturn = ctx.createGain();
+  hallReturn.gain.value = 0.22;
+  room.connect(hall).connect(hallReturn).connect(master);
   // Stings go dry to the master and wet to the room.
   const sting = ctx.createGain();
   sting.connect(master);
@@ -365,7 +379,8 @@ export function createSlotAudio(): SlotAudio {
     },
     revealPop: (index) => {
       const at = ctx.currentTime;
-      const semitone = [22, 27, 31, 34][index] ?? 34;
+      // Each pop is the next note of the machine's hook, so reveals and tier crossings sing it.
+      const semitone = [19, 24, 28, 31][index] ?? 31;
       noiseHit({ at, peak: 0.35, decay: 0.12, frequency: 2400, q: 1.2 });
       tone({ type: "sine", frequency: 120, endFrequency: 50, at, peak: 0.5, decay: 0.15 });
       bell(PITCH(semitone), at, 0.22, 1);

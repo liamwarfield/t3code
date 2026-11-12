@@ -404,9 +404,9 @@ export function slotQuip(outcome: SlotOutcome, installed: boolean): string {
   if (outcome.agi) return `AGI achieved internally. You get ${model.name}.`;
   if (outcome.benchmaxxed) return "Initial results were not reproducible.";
   if (outcome.nearMissReel === 2 && outcome.teaseEffort)
-    return `${outcome.teaseEffort.label} was one row away.`;
+    return `${outcome.teaseEffort.label} was right there. So was your rate limit.`;
   if (outcome.nearMissReel === 1 && outcome.teaseModel)
-    return `${outcome.teaseModel.name} was one row away.`;
+    return `${outcome.teaseModel.name} was right there. The reel chose violence.`;
   if (provider.driverKind === "grok") return "It wrote the code, then posted about it.";
   if (provider.driverKind === "cursor")
     return model.slug === "auto"

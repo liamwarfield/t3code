@@ -2484,3 +2484,8 @@
   height: 14px;
   flex: none;
 }
+/* The quip is the joke; it reads at a glance. */
+[data-slot-banner] [data-slot-quip] {
+  font-size: 17px;
+  line-height: 1.3;
+}

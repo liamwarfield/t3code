@@ -1221,7 +1221,9 @@ export default function SlotMachine(props: {
             ? Math.min(HEAT_MAX, heatRef.current + 1)
             : heatRef.current;
       reachedHotStreak = nextHeat === HEAT_MAX && heatRef.current < HEAT_MAX;
-      setStreakProtected(!wasHot && level > 0 && !profitable && heatRef.current > 0);
+      setStreakProtected(
+        !wasHot && level > 0 && earned <= SPIN_COST && !result.sponsored && heatRef.current > 0,
+      );
       heatRef.current = reachedHotStreak ? 0 : nextHeat;
       if (reachedHotStreak) hotPullRef.current = true;
     }
@@ -1733,6 +1735,10 @@ export default function SlotMachine(props: {
           ? "edgelord"
           : "house";
   const rawStamp = showResult && revealed ? slotStamp(outcome, resultInstalled) : null;
+  // The card shows how much of this provider's collection you've found, a goal for the next pull.
+  const providerDexKeys = showResult ? slotComboKeys([outcome.provider]) : [];
+  const providerDexTotal = providerDexKeys.length;
+  const providerDexFound = providerDexKeys.filter((key) => dex.includes(key)).length;
   const nearMissShown = showResult && revealed && outcome.nearMissReel !== null;
   const willDealLoot = showResult && resultInstalled && (level >= 2 || outcome.agi);
   const lootCard = willDealLoot && revealStep >= 4;
@@ -1872,10 +1878,12 @@ export default function SlotMachine(props: {
               <span data-slot-title-kicker>
                 {hotPull
                   ? "HOT STREAK · NEXT PULL PAYS 2×"
-                  : streakProtected
-                    ? "STREAK PROTECTED (it was a loss)"
-                    : heat === HEAT_MAX - 1
-                      ? "ONE MORE WIN FOR 2×"
+                  : heat === HEAT_MAX - 1
+                    ? streakProtected
+                      ? "STREAK HELD · ONE MORE WIN FOR 2×"
+                      : "ONE MORE WIN FOR 2×"
+                    : streakProtected
+                      ? "STREAK PROTECTED (it was a loss)"
                       : `AGI POOL ${formatTokens(pool)} · funded by your losses`}
               </span>
               <span data-slot-title-main>ONE-ARMED BENCHMARK</span>
@@ -2252,7 +2260,7 @@ export default function SlotMachine(props: {
                     <span data-slot-loot-model>{outcome.model.name}</span>
                     <span data-slot-loot-payout>+{formatTokens(earnedShown)} tokens</span>
                     <span data-slot-loot-meta>
-                      {outcome.provider.displayName} · {"★".repeat(outcome.model.tier)} ·{" "}
+                      {outcome.provider.displayName} {providerDexFound}/{providerDexTotal} ·{" "}
                       {outcome.effort.label} effort
                     </span>
                   </div>
@@ -2331,11 +2339,10 @@ export default function SlotMachine(props: {
                   type="button"
                   data-slot-button
                   data-slot-button-collect
-                  disabled={!showResult || !revealed}
-                  // A free spin isn't a dead end: the button pulls again instead of collecting.
-                  onClick={resultInstalled ? collect : autoPull}
+                  disabled={!showResult || !revealed || !resultInstalled}
+                  onClick={collect}
                 >
-                  {showResult && !resultInstalled ? "FREE SPIN" : "COLLECT"}
+                  COLLECT
                 </button>
               )}
             </div>
