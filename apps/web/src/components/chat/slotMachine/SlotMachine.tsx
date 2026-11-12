@@ -1374,7 +1374,7 @@ export default function SlotMachine(props: {
         ? [1000, 1500, 2000]
         : turboRef.current
           ? [380, 560, 740]
-          : [750, 1100, 1450];
+          : [600, 850, 1100];
       return {
         start: 1,
         end: strip.length - 2,
@@ -1878,13 +1878,15 @@ export default function SlotMachine(props: {
               <span data-slot-title-kicker>
                 {hotPull
                   ? "HOT STREAK · NEXT PULL PAYS 2×"
-                  : heat === HEAT_MAX - 1
-                    ? streakProtected
-                      ? "STREAK HELD · ONE MORE WIN FOR 2×"
-                      : "ONE MORE WIN FOR 2×"
-                    : streakProtected
-                      ? "STREAK PROTECTED (it was a loss)"
-                      : `AGI POOL ${formatTokens(pool)} · funded by your losses`}
+                  : showResult && outcome.sponsored && revealed
+                    ? "PAID PLACEMENT · DOESN'T COUNT TOWARD HEAT"
+                    : heat === HEAT_MAX - 1
+                      ? streakProtected
+                        ? "STREAK HELD · ONE MORE WIN FOR 2×"
+                        : "ONE MORE WIN FOR 2×"
+                      : streakProtected
+                        ? "STREAK PROTECTED (it was a loss)"
+                        : `AGI POOL ${formatTokens(pool)} · funded by your losses`}
               </span>
               <span data-slot-title-main>ONE-ARMED BENCHMARK</span>
             </div>

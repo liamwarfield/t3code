@@ -388,6 +388,8 @@ const choose = (seed: number, lines: ReadonlyArray<string>) => lines[seed % line
 
 export function slotQuip(outcome: SlotOutcome, installed: boolean): string {
   const { provider, model, effort, tier, quipSeed: seed } = outcome;
+  if (outcome.jester && !installed)
+    return `${provider.displayName} isn't installed. The jester paid you in vibes. Next pull is free.`;
   if (outcome.jester)
     return choose(seed, [
       "Confidently wrong at a 1M context window.",

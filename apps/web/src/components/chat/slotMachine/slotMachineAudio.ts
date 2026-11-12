@@ -207,37 +207,49 @@ export function createSlotAudio(): SlotAudio {
   let payoutBus: GainNode | null = null;
   // Each pull detunes the motor and drone a little, so no two spins sound identical.
   let pullDetune = 0;
-  // One key per pull: stops, stings, fanfare and payout music all transpose together.
-  let pullKey = 0;
-  const PITCH = (semitonesFromA4: number) => NOTE(semitonesFromA4 + pullKey);
+  // One fixed key, so the win hook is the same phrase every time and players learn it.
+  const PITCH = (semitonesFromA4: number) => NOTE(semitonesFromA4);
+
+  // One struck-coin sample, computed once: inharmonic partials, a low body knock and a
+  // bounce. Playing a buffer at varied rates gives coins weight that live oscillators lack.
+  const coinBuffer = (() => {
+    const length = Math.floor(ctx.sampleRate * 0.45);
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    const partials: ReadonlyArray<readonly [number, number, number]> = [
+      [1, 1, 9],
+      [2.32, 0.7, 12],
+      [3.81, 0.5, 16],
+      [5.4, 0.35, 22],
+      [7.1, 0.22, 30],
+      [9.2, 0.14, 38],
+    ];
+    const base = 1850;
+    for (const strike of [0, 0.048]) {
+      const start = Math.floor(strike * ctx.sampleRate);
+      const gain = strike === 0 ? 1 : 0.45;
+      for (let index = start; index < length; index++) {
+        const t = (index - start) / ctx.sampleRate;
+        let sample = 0;
+        for (const [ratio, level, decay] of partials) {
+          sample += level * Math.sin(2 * Math.PI * base * ratio * t) * Math.exp(-decay * t);
+        }
+        sample += 0.8 * Math.sin(2 * Math.PI * 190 * t) * Math.exp(-60 * t);
+        if (t < 0.004) sample += (Math.random() * 2 - 1) * (1 - t / 0.004) * 1.4;
+        data[index] = (data[index] ?? 0) + sample * gain * 0.28;
+      }
+    }
+    return buffer;
+  })();
 
   const coinClink = (at: number, out: AudioNode, peak = 0.14) => {
-    // Inharmonic partials are what make struck metal sound like metal, not a sine beep.
-    const base = 1500 + Math.random() * 1100;
-    // A 3 ms bandpassed strike gives the clink a metal edge before the partials ring.
-    noiseHit({
-      at,
-      peak: peak * 0.8,
-      decay: 0.003,
-      frequency: 5200 + Math.random() * 1800,
-      q: 2,
-      out,
-    });
-    for (const [ratio, level, decay] of [
-      [1, 1, 0.12],
-      [2.76, 0.6, 0.09],
-    ] as const) {
-      tone({ type: "sine", frequency: base * ratio, at, peak: peak * level, decay, out });
-      tone({
-        type: "sine",
-        frequency: base * ratio * 1.004,
-        at: at + 0.045,
-        peak: peak * level * 0.7,
-        decay: decay * 1.8,
-        out,
-      });
-    }
-    noiseHit({ at, peak: peak * 0.9, decay: 0.015, frequency: 8000, q: 1.5, out });
+    const source = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    source.buffer = coinBuffer;
+    source.playbackRate.value = 0.82 + Math.random() * 0.42;
+    gain.gain.value = peak * 2.4;
+    source.connect(gain).connect(out);
+    source.start(at);
   };
 
   const kaching = (at: number, out: AudioNode) => {
@@ -304,7 +316,6 @@ export function createSlotAudio(): SlotAudio {
       const gain = ctx.createGain();
       osc.type = "sawtooth";
       pullDetune = (Math.random() - 0.5) * 4;
-      pullKey = Math.floor(Math.random() * 5) - 2;
       osc.frequency.setValueAtTime(38 * 2 ** (pullDetune / 12), at);
       osc.frequency.exponentialRampToValueAtTime(72 * 2 ** (pullDetune / 12), at + 0.35);
       lfo.frequency.value = 11;
@@ -450,7 +461,8 @@ export function createSlotAudio(): SlotAudio {
       filter.frequency.exponentialRampToValueAtTime(3800, at + 3);
       tremolo.frequency.setValueAtTime(5, at);
       tremolo.frequency.linearRampToValueAtTime(14, at + 3);
-      tremoloGain.gain.value = 0.05;
+      // Depth stays under the drone's own level, so the tremolo pulses instead of phase-flipping.
+      tremoloGain.gain.value = 0.012;
       tremolo.connect(tremoloGain).connect(gain.gain);
       gain.gain.setValueAtTime(0.0001, at);
       gain.gain.exponentialRampToValueAtTime(0.028, at + 0.6);
@@ -685,7 +697,7 @@ export function createSlotAudio(): SlotAudio {
         if (index % 2 === 0 && level >= 2)
           noiseHit({
             at: noteAt,
-            peak: 0.06,
+            peak: 0.035,
             decay: 0.03,
             frequency: 9000,
             type: "highpass",
