@@ -29,6 +29,8 @@ import {
 } from "./composerProviderState";
 import type { useComposerProviderModel } from "./useComposerProviderModel";
 import { resolveComposerControlsOwnership } from "./composerControlsOwnership";
+import { useComposerDraftStore } from "../../composerDraftStore";
+import { mergeEffortSelection } from "./slotMachine/slotMachineLogic";
 
 /**
  * The composer footer controls: model picker, traits, mode controls and the overflow menu for
@@ -150,6 +152,9 @@ export function ComposerControlsBar(props: {
     onPromptEdit,
     planModeEnabled,
   });
+  const setProviderModelOptions = useComposerDraftStore((store) => store.setProviderModelOptions);
+  const composerThreadTarget =
+    routeKind === "server" ? routeThreadRef : routeKind === "draft" ? draftId : null;
   const accessMatchesDefault = compatibleRuntimeMode === defaultRuntimeMode;
   const permissionsChipHidden = accessMatchesDefault || props.permissionsShownInStrip;
   const providerTraitsPickerInput = {
@@ -288,6 +293,25 @@ export function ComposerControlsBar(props: {
       onOpenChange={onModelPickerOpenChange}
       getModelDisabledReason={getModelDisabledReason}
       onOpenProviderSetup={onOpenProviderSetup}
+      onSlotCollect={(selection) => {
+        onMultipleModelSelectionsChange(null);
+        onProviderModelSelect(selection.instanceId, selection.model);
+        const driverKind = providerInstanceEntries.find(
+          (entry) => entry.instanceId === selection.instanceId,
+        )?.driverKind;
+        if (!composerThreadTarget || !driverKind || !selection.effortOptionId) return;
+        if (!selection.effortValue) return;
+        setProviderModelOptions(
+          composerThreadTarget,
+          driverKind,
+          mergeEffortSelection(
+            composerModelOptions?.[selection.instanceId],
+            selection.effortOptionId,
+            selection.effortValue,
+          ),
+          { instanceId: selection.instanceId, model: selection.model, persistSticky: true },
+        );
+      }}
     />
   );
   return showProviderUnavailable ? (

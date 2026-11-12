@@ -5,7 +5,7 @@ import {
   type ProviderDriverKind,
   type ResolvedKeybindingsConfig,
 } from "@t3tools/contracts";
-import { memo, useRef, useState } from "react";
+import { lazy, memo, Suspense, useRef, useState } from "react";
 import { Badge } from "../ui/badge";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -18,6 +18,9 @@ import { shouldShowInstanceBadge, type ProviderInstanceEntry } from "../../provi
 import { ComposerControl, type ComposerControlSize } from "./ComposerControl";
 import { useComposerMenuProps } from "./composerEventScope";
 import { shortcutLabelForCommand } from "../../keybindings";
+import type { SlotCollectSelection } from "./slotMachine/SlotMachine";
+
+const SlotMachine = lazy(() => import("./slotMachine/SlotMachine"));
 
 /** Holds the page still behind the open picker; its lifetime is the popup element's. */
 function lockBackgroundScroll(popup: HTMLElement | null) {
@@ -91,7 +94,10 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   onOpenProviderSetup?: (instanceId: ProviderInstanceId) => void;
   getModelDisabledReason?: (instanceId: ProviderInstanceId, model: string) => string | null;
   onInstanceModelChange: (instanceId: ProviderInstanceId, model: string) => void;
+  /** Enables the slot machine; it collects a model and effort in one pull. */
+  onSlotCollect?: (selection: SlotCollectSelection) => void;
 }) {
+  const [slotMachineOpen, setSlotMachineOpen] = useState(false);
   const composerFloatingLayerProps = useComposerMenuProps();
   const [uncontrolledIsMenuOpen, setUncontrolledIsMenuOpen] = useState(false);
   const isMenuOpen = props.open ?? uncontrolledIsMenuOpen;
@@ -312,7 +318,35 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
         {props.selectedModels === undefined ? (
           <ChatGptSharingControl provider={activeEntry?.snapshot ?? null} />
         ) : null}
+        {props.onSlotCollect && props.selectedModels === undefined ? (
+          <button
+            type="button"
+            className="flex w-full items-center justify-between gap-2 border-t border-border/70 px-3 py-2 text-left text-muted-foreground text-xs hover:bg-accent hover:text-foreground"
+            onClick={() => {
+              setIsMenuOpen(false);
+              setSlotMachineOpen(true);
+            }}
+          >
+            <span>🎰 Feeling lucky? Pull the lever</span>
+            <span className="text-muted-foreground/70">model · effort</span>
+          </button>
+        ) : null}
       </PopoverPopup>
+      {slotMachineOpen && props.onSlotCollect ? (
+        <Suspense fallback={null}>
+          <SlotMachine
+            instanceEntries={props.instanceEntries}
+            {...(props.getModelDisabledReason
+              ? { getModelDisabledReason: props.getModelDisabledReason }
+              : {})}
+            onCollect={(selection) => {
+              setSlotMachineOpen(false);
+              if (!props.disabled) props.onSlotCollect?.(selection);
+            }}
+            onClose={() => setSlotMachineOpen(false)}
+          />
+        </Suspense>
+      ) : null}
     </Popover>
   );
 });

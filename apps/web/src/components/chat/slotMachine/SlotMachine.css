@@ -1,0 +1,2529 @@
+/* The machine owns its look on purpose: it is a cabinet, not an app surface. Animations are
+   bounded by spin/payout phases so an idle machine never repaints. */
+
+[data-slot-overlay] {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  /* A solid scrim: a full-screen gradient or backdrop blur here repaints on every reel frame. */
+  background: rgb(8 2 6 / 0.86);
+  overflow: hidden;
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  color: #fff4dc;
+  user-select: none;
+}
+
+[data-slot-stage] {
+  --row: 92px;
+  --body: #5b0f1f;
+  --body-deep: #2a0610;
+  --trim: linear-gradient(180deg, #fefefe, #9da3ab 35%, #f5f7fa 55%, #6c7279);
+  --accent: #ffcc33;
+  --accent-hot: #ff5a1f;
+  --led: #ffb000;
+  --glass-tint: #0b0b12;
+  --pattern: none;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  outline: none;
+  transform: scale(min(1, calc((100vw - 32px) / 760px)), min(1, calc((100vw - 32px) / 760px)));
+}
+
+@media (max-height: 860px) {
+  [data-slot-stage] {
+    transform: scale(0.82);
+  }
+}
+
+[data-slot-stage][data-palette="jester"] {
+  --body: #4b1679;
+  --body-deep: #1d0636;
+  --accent: #b7ff2a;
+  --accent-hot: #ff2ad4;
+  --led: #b7ff2a;
+  --glass-tint: #10031d;
+  --pattern: repeating-conic-gradient(
+      from 45deg at 50% 50%,
+      rgb(183 255 42 / 0.16) 0 25%,
+      rgb(255 42 212 / 0.14) 0 50%
+    )
+    0 0 / 36px 36px;
+}
+
+[data-slot-stage][data-palette="edgelord"] {
+  --body: #121212;
+  --body-deep: #000;
+  --accent: #ff2b2b;
+  --accent-hot: #ff2b2b;
+  --led: #ff3b3b;
+}
+
+[data-slot-cabinet] {
+  position: relative;
+  z-index: 2;
+  width: 640px;
+  border-radius: 28px 28px 18px 18px;
+  padding: 10px;
+  background: var(--trim);
+  box-shadow:
+    0 30px 80px rgb(0 0 0 / 0.7),
+    0 0 0 2px rgb(0 0 0 / 0.6),
+    inset 0 2px 0 rgb(255 255 255 / 0.6);
+  transition: filter 300ms;
+}
+
+[data-slot-marquee] {
+  position: relative;
+  border-radius: 20px 20px 6px 6px;
+  padding: 18px 22px 16px;
+  background:
+    var(--pattern), radial-gradient(ellipse at 50% 0%, rgb(255 255 255 / 0.18), transparent 60%),
+    linear-gradient(180deg, var(--body), var(--body-deep));
+  text-align: center;
+  overflow: hidden;
+}
+
+[data-slot-bulbs] {
+  position: absolute;
+  inset: 5px;
+  border-radius: 16px 16px 4px 4px;
+  pointer-events: none;
+  --bulb-on: radial-gradient(circle, #fff7d1 0 2px, var(--accent) 3px, transparent 5.5px);
+  --bulb-off: radial-gradient(
+    circle,
+    rgb(255 255 255 / 0.35) 0 1.5px,
+    rgb(0 0 0 / 0.3) 3px,
+    transparent 5px
+  );
+  background:
+    var(--bulb-on) 0 0 / 22px 11px repeat-x,
+    var(--bulb-on) 0 100% / 22px 11px repeat-x,
+    var(--bulb-on) 0 0 / 11px 22px repeat-y,
+    var(--bulb-on) 100% 0 / 11px 22px repeat-y;
+  opacity: 0.55;
+}
+
+[data-slot-stage][data-phase="spinning"] [data-slot-bulbs] {
+  animation: slot-chase 340ms steps(2) infinite;
+  opacity: 1;
+}
+[data-slot-stage][data-hot] [data-slot-bulbs] {
+  animation-duration: 340ms;
+  filter: hue-rotate(-30deg) saturate(2);
+}
+[data-slot-stage][data-phase="result"][data-level="2"] [data-slot-bulbs],
+[data-slot-stage][data-phase="result"][data-level="3"] [data-slot-bulbs],
+[data-slot-stage][data-phase="result"][data-level="4"] [data-slot-bulbs] {
+  animation: slot-chase 120ms steps(2) 24;
+  opacity: 1;
+}
+
+[data-slot-title] {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+[data-slot-title-kicker] {
+  font-size: 10px;
+  letter-spacing: 0.45em;
+  color: rgb(255 244 220 / 0.7);
+}
+[data-slot-title-main] {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #fff9e0 0%, var(--accent) 45%, #c26a00 52%, #ffe28a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(60 20 0 / 0.6);
+  filter: drop-shadow(0 3px 0 rgb(0 0 0 / 0.55)) drop-shadow(0 0 14px rgb(255 190 40 / 0.35));
+}
+[data-slot-stage][data-palette="jester"] [data-slot-title-main] {
+  background: linear-gradient(90deg, #ff2ad4, #b7ff2a, #ffd400, #ff2ad4);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+[data-slot-title-sub] {
+  font-size: 11px;
+  color: rgb(255 244 220 / 0.6);
+  font-style: italic;
+}
+
+[data-slot-jester-hat] {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  font-size: 34px;
+  animation: slot-hat 900ms cubic-bezier(0.34, 1.56, 0.64, 1) 1 both;
+}
+
+[data-slot-body] {
+  margin-top: 8px;
+  border-radius: 6px 6px 12px 12px;
+  padding: 14px 18px 16px;
+  background: var(--pattern), linear-gradient(180deg, var(--body), var(--body-deep));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+[data-slot-meters] {
+  display: grid;
+  grid-template-columns: 1.4fr 1.2fr 0.8fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+[data-slot-meter] {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #090304;
+  box-shadow:
+    inset 0 2px 6px rgb(0 0 0 / 0.9),
+    0 1px 0 rgb(255 255 255 / 0.12);
+}
+[data-slot-meter-label] {
+  font-size: 9px;
+  letter-spacing: 0.3em;
+  color: rgb(255 244 220 / 0.5);
+}
+[data-slot-meter-value] {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--led);
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--led) 80%, transparent),
+    0 0 18px color-mix(in srgb, var(--led) 40%, transparent);
+  white-space: nowrap;
+}
+[data-slot-meter-small] [data-slot-meter-value] {
+  font-size: 16px;
+  padding-top: 4px;
+}
+
+[data-slot-window] {
+  position: relative;
+  padding: 22px 12px 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #d7d9dd, #6f747b);
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.45);
+}
+[data-slot-reel-labels] {
+  position: absolute;
+  top: 4px;
+  left: 12px;
+  right: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1.35fr 1fr;
+  gap: 10px;
+  font-size: 10px;
+  letter-spacing: 0.3em;
+  text-align: center;
+  color: #1a1a1a;
+  font-weight: 700;
+}
+
+[data-slot-reels] {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr 1fr;
+  gap: 10px;
+}
+
+[data-slot-reel] {
+  position: relative;
+  height: calc(var(--row) * 3);
+  overflow: hidden;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #d9d4c7, #fffaf0 30%, #fffaf0 70%, #d9d4c7);
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.5);
+  transition:
+    opacity 200ms,
+    box-shadow 200ms;
+}
+[data-slot-reel][data-dimmed] {
+  opacity: 0.5;
+}
+[data-slot-reel][data-hot] {
+  box-shadow:
+    inset 0 0 0 3px var(--accent-hot),
+    0 0 24px var(--accent-hot),
+    0 0 60px color-mix(in srgb, var(--accent-hot) 60%, transparent);
+}
+[data-slot-reel][data-stopped] [data-slot-strip] {
+  animation: slot-land 260ms ease-out 1;
+}
+
+[data-slot-strip] {
+  will-change: transform;
+}
+
+[data-slot-symbol] {
+  height: var(--row);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 6px;
+  color: #1c1310;
+  text-align: center;
+  border-bottom: 1px dashed rgb(0 0 0 / 0.08);
+}
+[data-slot-symbol][data-dim] {
+  filter: grayscale(0.85);
+  opacity: 0.7;
+}
+[data-slot-symbol][data-jackpot] [data-slot-symbol-label] {
+  background: linear-gradient(180deg, #ffe680, #d18b00 55%, #8a4b00);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 rgb(0 0 0 / 0.35));
+}
+[data-slot-symbol][data-kind="0"][data-jester] {
+  background: repeating-conic-gradient(
+      from 45deg,
+      rgb(160 60 255 / 0.18) 0 25%,
+      rgb(120 220 40 / 0.18) 0 50%
+    )
+    0 0 / 20px 20px;
+}
+[data-slot-symbol][data-kind="0"][data-jester] [data-slot-symbol-label] {
+  background: linear-gradient(90deg, #a02cff, #3f9e00);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-slot-symbol-label] {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 19px;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-slot-model-name] {
+  font-size: 23px;
+}
+[data-slot-effort-name] {
+  font-size: 22px;
+  text-transform: uppercase;
+}
+[data-slot-effort-name][data-long] {
+  font-size: 16px;
+}
+[data-slot-symbol-caption] {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(28 19 16 / 0.55);
+}
+[data-slot-symbol-stars] {
+  font-size: 14px;
+  color: #e09a00;
+  letter-spacing: 2px;
+}
+[data-slot-star-off] {
+  color: rgb(0 0 0 / 0.15);
+}
+[data-slot-effort-bars] {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+[data-slot-effort-bars] i {
+  width: 7px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 0.15);
+}
+[data-slot-effort-bars] i:nth-child(1) {
+  height: 8px;
+}
+[data-slot-effort-bars] i:nth-child(2) {
+  height: 12px;
+}
+[data-slot-effort-bars] i:nth-child(3) {
+  height: 17px;
+}
+[data-slot-effort-bars] i:nth-child(4) {
+  height: 22px;
+}
+[data-slot-effort-bars] i[data-on] {
+  background: linear-gradient(180deg, #ff7a1a, #c81e00);
+}
+
+[data-slot-symbol][data-payline] {
+  animation: slot-payline-pop 520ms cubic-bezier(0.34, 1.56, 0.64, 1) 1 both;
+}
+[data-slot-stage][data-level="0"] [data-slot-symbol][data-payline] {
+  animation: none;
+}
+[data-slot-symbol][data-tease] {
+  animation: slot-tease 350ms ease-in-out 4 alternate;
+  background: rgb(255 40 40 / 0.18);
+}
+
+[data-slot-glass] {
+  position: absolute;
+  inset: 22px 12px 12px;
+  pointer-events: none;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 0.55), transparent 22%, transparent 78%, rgb(0 0 0 / 0.55)),
+    repeating-linear-gradient(180deg, rgb(0 0 0 / 0.06) 0 1px, transparent 1px 3px),
+    linear-gradient(115deg, rgb(255 255 255 / 0.22), transparent 28%);
+}
+
+[data-slot-payline] {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: calc(22px + var(--row) * 1.5);
+  height: 3px;
+  margin-top: -1.5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  background: rgb(220 20 40 / 0.75);
+  box-shadow: 0 0 6px rgb(255 30 60 / 0.8);
+  z-index: 3;
+}
+[data-slot-payline-arrow] {
+  font-size: 14px;
+  color: #ff2840;
+  text-shadow: 0 0 6px #ff2840;
+  line-height: 0;
+}
+[data-slot-payline][data-win] {
+  height: 5px;
+  margin-top: -2.5px;
+  background: var(--accent);
+  box-shadow:
+    0 0 14px var(--accent),
+    0 0 40px var(--accent);
+  animation: slot-payline-flash 400ms steps(2) 4;
+}
+[data-slot-payline][data-win] [data-slot-payline-arrow] {
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent);
+}
+
+[data-slot-banner] {
+  margin: 12px 0 10px;
+  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+[data-slot-headline] {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  text-shadow:
+    0 3px 0 rgb(0 0 0 / 0.6),
+    0 0 18px color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: slot-slam 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 1 both;
+}
+[data-slot-banner][data-level="3"] [data-slot-headline],
+[data-slot-banner][data-level="4"] [data-slot-headline] {
+  font-size: 54px;
+  background: linear-gradient(180deg, #fff, var(--accent) 50%, var(--accent-hot));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 0 rgb(0 0 0 / 0.6)) drop-shadow(0 0 20px var(--accent));
+  animation: slot-slam-big 700ms cubic-bezier(0.22, 1.8, 0.4, 1) 1 both;
+}
+[data-slot-quip] {
+  max-width: 520px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: rgb(255 244 220 / 0.82);
+}
+
+[data-slot-controls] {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1.3fr;
+  gap: 10px;
+}
+[data-slot-button] {
+  height: 44px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    transform 80ms,
+    filter 120ms;
+  box-shadow:
+    0 4px 0 rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+[data-slot-button]:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    0 1px 0 rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+[data-slot-button]:disabled {
+  cursor: default;
+  filter: grayscale(0.7) brightness(0.7);
+}
+[data-slot-button-ghost] {
+  background: linear-gradient(180deg, #3a3a3f, #1c1c20);
+  color: #ddd;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+[data-slot-button-spin] {
+  background: linear-gradient(180deg, #ff6a5a, #c4101f);
+  color: #fff;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.5);
+}
+[data-slot-button-collect] {
+  background: linear-gradient(180deg, #fff1a8, var(--accent) 50%, #b07800);
+  color: #2b1600;
+}
+[data-slot-stage][data-phase="result"]:not([data-level="0"])
+  [data-slot-button-collect]:not(:disabled) {
+  animation: slot-collect 500ms ease-in-out 4 alternate;
+}
+
+[data-slot-paytable] {
+  margin-top: 12px;
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.35);
+  font-size: 11px;
+}
+[data-slot-paytable-row] {
+  display: grid;
+  grid-template-columns: 90px 1fr 90px;
+  gap: 8px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: rgb(255 244 220 / 0.55);
+}
+[data-slot-paytable-row] > :last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+[data-slot-paytable-combo] {
+  color: rgb(255 244 220 / 0.4);
+}
+[data-slot-paytable-row][data-lit] {
+  background: var(--accent);
+  color: #1a0d00;
+  font-weight: 800;
+  animation: slot-paytable 400ms steps(2) 4;
+}
+[data-slot-paytable-row][data-lit] [data-slot-paytable-combo] {
+  color: #1a0d00;
+}
+
+[data-slot-tray] {
+  margin: 8px 40px 0;
+  height: 26px;
+  border-radius: 0 0 14px 14px;
+  background: linear-gradient(180deg, #6f747b, #2a2c30);
+  display: grid;
+  place-items: center;
+}
+[data-slot-tray-slot] {
+  width: 60%;
+  height: 8px;
+  border-radius: 4px;
+  background: #050505;
+  box-shadow: inset 0 2px 3px rgb(0 0 0 / 1);
+}
+
+[data-slot-lever-housing] {
+  position: relative;
+  z-index: 1;
+  width: 74px;
+  height: 420px;
+  margin-left: -6px;
+}
+[data-slot-lever-hub] {
+  position: absolute;
+  left: 8px;
+  top: 190px;
+  width: 52px;
+  height: 92px;
+  border-radius: 0 16px 16px 0;
+  background: var(--trim);
+  box-shadow: 4px 8px 18px rgb(0 0 0 / 0.6);
+}
+[data-slot-lever] {
+  --pull: 0;
+  position: absolute;
+  left: 22px;
+  top: 0;
+  width: 40px;
+  height: 420px;
+  cursor: grab;
+  touch-action: none;
+  z-index: 2;
+}
+[data-slot-lever]:active {
+  cursor: grabbing;
+}
+/* A rod pivoting toward the viewer, faked by flipping its height through zero. */
+[data-slot-lever-rod] {
+  position: absolute;
+  left: 13px;
+  width: 12px;
+  top: 236px;
+  height: 200px;
+  transform-origin: 50% 0;
+  transform: translateY(-100%) scaleY(calc(1 - var(--pull) * 2));
+  transform-origin: 50% 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #6c7279, #fefefe 45%, #9da3ab);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4);
+}
+[data-slot-lever-ball] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  /* The rod's tip travels 2 × its 200px length over a full pull; the ball rides the tip. */
+  transform: translateY(calc(var(--pull) * 400px - 4px))
+    scale(calc(1 + (0.25 - (var(--pull) - 0.5) * (var(--pull) - 0.5)) * 1.2));
+  background: radial-gradient(circle at 34% 30%, #fff 0 8%, #ff4d4d 22%, #b0001a 70%, #5a0010);
+  box-shadow:
+    0 6px 14px rgb(0 0 0 / 0.55),
+    inset -4px -6px 10px rgb(0 0 0 / 0.35);
+}
+[data-slot-stage][data-palette="jester"] [data-slot-lever-ball] {
+  background: radial-gradient(circle at 34% 30%, #fff 0 8%, #d74bff 22%, #5f00a0 70%, #22003b);
+}
+
+[data-slot-rays] {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: 50%;
+  width: 1500px;
+  height: 1500px;
+  margin: -750px 0 0 -750px;
+  pointer-events: none;
+  background: repeating-conic-gradient(
+    from 0deg,
+    color-mix(in srgb, var(--accent) 38%, transparent) 0 7deg,
+    transparent 7deg 18deg
+  );
+  mask-image: radial-gradient(circle, #000 0 18%, transparent 62%);
+  animation: slot-rays 3600ms ease-out 1 both;
+}
+
+[data-slot-coins] {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+}
+[data-slot-stage] [data-slot-coins] {
+  position: absolute;
+  inset: -300px -400px;
+  width: calc(100% + 800px);
+  height: calc(100% + 600px);
+}
+
+@keyframes slot-chase {
+  to {
+    background-position:
+      11px 0,
+      11px 100%,
+      0 11px,
+      100% 11px;
+  }
+}
+@keyframes slot-land {
+  0% {
+    filter: brightness(1.8);
+  }
+  100% {
+    filter: none;
+  }
+}
+@keyframes slot-payline-pop {
+  0% {
+    transform: scale(1);
+    background: transparent;
+  }
+  40% {
+    transform: scale(1.18);
+    background: color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+@keyframes slot-tease {
+  to {
+    background: rgb(255 40 40 / 0.45);
+    transform: translateX(3px);
+  }
+}
+@keyframes slot-payline-flash {
+  to {
+    opacity: 0.35;
+  }
+}
+@keyframes slot-slam {
+  0% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes slot-slam-big {
+  0% {
+    transform: scale(4) rotate(-8deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.9) rotate(2deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+@keyframes slot-hat {
+  0% {
+    transform: translateY(-80px) rotate(-40deg);
+  }
+  100% {
+    transform: translateY(0) rotate(12deg);
+  }
+}
+@keyframes slot-collect {
+  to {
+    filter: brightness(1.35);
+    transform: scale(1.04);
+  }
+}
+@keyframes slot-paytable {
+  to {
+    filter: brightness(1.6);
+  }
+}
+@keyframes slot-rays {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) scale(0.4);
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(80deg) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot-rays],
+  [data-slot-stage] [data-slot-bulbs] {
+    animation: none !important;
+  }
+}
+
+[data-slot-flash] {
+  position: absolute;
+  inset: -100vh -100vw;
+  z-index: 7;
+  pointer-events: none;
+  background: #fff;
+  opacity: 0;
+}
+
+[data-slot-heat] {
+  display: flex;
+  gap: 4px;
+  padding-top: 7px;
+}
+[data-slot-heat] i {
+  flex: 1;
+  height: 12px;
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.08);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.8);
+}
+[data-slot-heat] i[data-on] {
+  background: linear-gradient(180deg, #ffd34d, #ff4d1a);
+  box-shadow: 0 0 8px #ff6a1a;
+}
+[data-slot-heat] i[data-on]:nth-child(n + 4) {
+  background: linear-gradient(180deg, #fff1a8, #ff2a2a);
+  box-shadow: 0 0 12px #ff2a2a;
+}
+
+[data-slot-reel][data-beam="2"] {
+  --accent-hot: #39d5ff;
+}
+[data-slot-reel][data-beam="3"] {
+  --accent-hot: #c04dff;
+}
+[data-slot-reel][data-beam="4"] {
+  --accent-hot: #ffcc33;
+}
+[data-slot-reel][data-beam]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--accent-hot) 28%, transparent) 50%,
+    transparent
+  );
+}
+
+[data-slot-symbol] {
+  position: relative;
+}
+[data-slot-tease-tag] {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: #e0102a;
+  box-shadow: 0 0 10px #ff2840;
+  animation: slot-tease 350ms ease-in-out 4 alternate;
+}
+
+/* The winning row must be the most legible thing on screen. */
+[data-slot-symbol][data-payline] [data-slot-symbol-label] {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: #1a0d00;
+  filter: none;
+}
+[data-slot-stage]:not([data-level="0"]) [data-slot-symbol][data-payline] {
+  box-shadow:
+    inset 0 0 0 3px var(--accent),
+    inset 0 0 22px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+[data-slot-symbol][data-dim] [data-slot-symbol-caption] {
+  color: #8a1020;
+  font-weight: 800;
+}
+
+[data-slot-stage][data-on-fire] [data-slot-cabinet] {
+  box-shadow:
+    0 30px 80px rgb(0 0 0 / 0.7),
+    0 0 0 2px rgb(0 0 0 / 0.6),
+    0 0 40px #ff4d1a,
+    0 0 90px rgb(255 60 20 / 0.6);
+}
+[data-slot-stage][data-on-fire] [data-slot-bulbs] {
+  --bulb-on: radial-gradient(circle, #fff 0 2px, #ff3b1a 3px, transparent 5.5px);
+  opacity: 1;
+}
+[data-slot-stage][data-on-fire] [data-slot-title-kicker] {
+  color: #ffb07a;
+  font-weight: 800;
+}
+
+/* The payline frames the winning row instead of striking through its text. */
+[data-slot-payline] {
+  top: calc(22px + var(--row));
+  height: var(--row);
+  margin-top: 0;
+  background: transparent;
+  border-top: 2px solid rgb(230 30 50 / 0.85);
+  border-bottom: 2px solid rgb(230 30 50 / 0.85);
+  box-shadow: none;
+}
+[data-slot-payline][data-win] {
+  height: var(--row);
+  margin-top: 0;
+  background: transparent;
+  border-color: var(--accent);
+  box-shadow:
+    0 0 16px var(--accent),
+    inset 0 0 16px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+[data-slot-payline-arrow] {
+  font-size: 18px;
+  margin: 0 -10px;
+}
+
+[data-slot-stage] [data-slot-window],
+[data-slot-stage] [data-slot-banner],
+[data-slot-stage] [data-slot-marquee] {
+  transition: filter 160ms;
+}
+[data-slot-stage][data-blackout] [data-slot-marquee],
+[data-slot-stage][data-blackout] [data-slot-meters],
+[data-slot-stage][data-blackout] [data-slot-controls],
+[data-slot-stage][data-blackout] [data-slot-paytable] {
+  filter: brightness(0.18) saturate(0.4);
+}
+[data-slot-stage][data-blackout] [data-slot-symbol]:not([data-payline]) {
+  filter: brightness(0.25);
+}
+[data-slot-stage][data-blackout] [data-slot-payline] {
+  border-color: #fff;
+  box-shadow:
+    0 0 24px #fff,
+    inset 0 0 30px rgb(255 255 255 / 0.7);
+}
+[data-slot-stage][data-blackout] [data-slot-headline] {
+  color: #fff;
+  animation: none;
+}
+
+[data-slot-stamp] {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 86%;
+  padding: 4px 14px;
+  border: 4px double #d8102a;
+  border-radius: 10px;
+  color: #d8102a;
+  background: rgb(255 250 240 / 0.82);
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 24px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  transform: translate(-50%, -50%) rotate(-5deg);
+  animation: slot-stamp 380ms cubic-bezier(0.2, 1.6, 0.4, 1) 120ms 1 both;
+}
+[data-slot-stage][data-palette="jester"] [data-slot-stamp] {
+  color: #7a10c8;
+  border-color: #7a10c8;
+}
+@keyframes slot-stamp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(-24deg) scale(3);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) rotate(-5deg) scale(1);
+  }
+}
+
+[data-slot-refund] {
+  margin-top: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #0b2a12;
+  background: #7dff9a;
+  box-shadow: 0 0 12px rgb(125 255 154 / 0.6);
+}
+[data-slot-stage][data-phase="result"] [data-slot-button-spin]:not(:disabled) {
+  box-shadow:
+    0 4px 0 rgb(0 0 0 / 0.55),
+    0 0 18px rgb(255 80 60 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+
+[data-slot-quip] {
+  font-size: 14px;
+  color: #fff4dc;
+}
+[data-slot-paytable-row] {
+  color: rgb(255 244 220 / 0.78);
+}
+[data-slot-paytable-combo] {
+  color: rgb(255 244 220 / 0.6);
+}
+[data-slot-symbol][data-jackpot] [data-slot-symbol-label] {
+  background: linear-gradient(180deg, #c98a00, #8a4b00 60%, #5a2a00);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ---- Headline: bright, outlined and punchy, because it is the payoff. ---- */
+[data-slot-headline],
+[data-slot-banner][data-level="3"] [data-slot-headline],
+[data-slot-banner][data-level="4"] [data-slot-headline] {
+  padding: 0 0.12em;
+  color: #fff6cf;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  -webkit-text-stroke: 2px #3a1400;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 10px color-mix(in srgb, var(--accent) 90%, transparent),
+    0 0 26px color-mix(in srgb, var(--accent) 70%, transparent),
+    0 4px 0 #2a0a00;
+  filter: none;
+  animation: slot-punch 300ms cubic-bezier(0.2, 1.8, 0.4, 1) 1 both;
+}
+@keyframes slot-punch {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ---- Stamps live in the banner, or on the loot card, never on the symbols. ---- */
+[data-slot-banner] {
+  position: relative;
+}
+[data-slot-banner] [data-slot-stamp] {
+  left: auto;
+  right: -8px;
+  top: -10px;
+  font-size: 15px;
+  padding: 2px 8px;
+  border-width: 3px;
+  background: #fff4dc;
+  mix-blend-mode: normal;
+  transform: rotate(8deg);
+  animation: slot-stamp-banner 380ms cubic-bezier(0.2, 1.6, 0.4, 1) 160ms 1 both;
+}
+@keyframes slot-stamp-banner {
+  0% {
+    opacity: 0;
+    transform: rotate(-14deg) scale(3);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(8deg) scale(1);
+  }
+}
+[data-slot-stamp][data-on-card] {
+  left: auto;
+  right: -18px;
+  top: 18px;
+  font-size: 15px;
+  padding: 2px 8px;
+  border-width: 3px;
+  background: #fff4dc;
+  mix-blend-mode: normal;
+  transform: rotate(12deg);
+  animation: slot-stamp-card 360ms cubic-bezier(0.2, 1.6, 0.4, 1) 450ms 1 both;
+}
+/* ---- Chest beat: payline symbols pop one by one in their rarity colour. ---- */
+[data-slot-symbol][data-rarity="RARE"] {
+  --rarity: #39b8ff;
+}
+[data-slot-symbol][data-rarity="EPIC"] {
+  --rarity: #c04dff;
+}
+[data-slot-symbol][data-rarity="LEGENDARY"] {
+  --rarity: #ffc21a;
+}
+[data-slot-symbol][data-rarity="MYTHIC"] {
+  --rarity: #ff4dd2;
+}
+[data-slot-symbol][data-pop] {
+  z-index: 3;
+  background: color-mix(in srgb, var(--rarity) 30%, #fffaf0);
+  box-shadow:
+    inset 0 0 0 3px var(--rarity),
+    0 0 24px var(--rarity);
+  animation: slot-pop 420ms cubic-bezier(0.2, 1.8, 0.4, 1) 1 both;
+}
+@keyframes slot-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.32);
+  }
+  100% {
+    transform: scale(1.06);
+  }
+}
+
+/* ---- Loot card: the item the chest gave you. ---- */
+[data-slot-loot] {
+  position: absolute;
+  inset: 22px 12px 12px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: radial-gradient(circle, rgb(0 0 0 / 0.25), rgb(0 0 0 / 0.72));
+  animation: slot-fade-in 220ms ease-out 1 both;
+}
+[data-slot-loot][data-rarity="RARE"] {
+  --rarity: #39b8ff;
+}
+[data-slot-loot][data-rarity="EPIC"] {
+  --rarity: #c04dff;
+}
+[data-slot-loot][data-rarity="LEGENDARY"] {
+  --rarity: #ffc21a;
+}
+[data-slot-loot][data-rarity="MYTHIC"] {
+  --rarity: #ff4dd2;
+}
+[data-slot-loot-card] {
+  position: relative;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 18px 10px;
+  border-radius: 14px;
+  color: #1c1310;
+  background:
+    linear-gradient(115deg, transparent 40%, rgb(255 255 255 / 0.75) 50%, transparent 60%) -200% 0 /
+      250% 100% no-repeat,
+    linear-gradient(180deg, #fffaf0, color-mix(in srgb, var(--rarity) 22%, #fffaf0));
+  box-shadow:
+    0 0 0 3px var(--rarity),
+    0 0 30px var(--rarity),
+    0 0 80px color-mix(in srgb, var(--rarity) 60%, transparent),
+    0 18px 40px rgb(0 0 0 / 0.6);
+  animation:
+    slot-deal 520ms cubic-bezier(0.2, 1.5, 0.4, 1) 1 both,
+    slot-shine 900ms ease-out 450ms 1 both;
+}
+[data-slot-loot][data-rarity="MYTHIC"] [data-slot-loot-card] {
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 30px #ff4dd2,
+    0 0 60px #4dd2ff,
+    0 0 110px #ffe14d,
+    0 18px 40px rgb(0 0 0 / 0.6);
+}
+@keyframes slot-deal {
+  0% {
+    transform: translateY(80px) rotateY(90deg) scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes slot-shine {
+  to {
+    background-position:
+      200% 0,
+      0 0;
+  }
+}
+@keyframes slot-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+[data-slot-loot-rarity] {
+  padding: 1px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.3em;
+  color: #fff;
+  background: var(--rarity);
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.4);
+}
+[data-slot-loot-model] {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 30px;
+  line-height: 1.05;
+  text-align: center;
+}
+[data-slot-loot-meta] {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(28 19 16 / 0.7);
+}
+[data-slot-loot-hint] {
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: rgb(28 19 16 / 0.55);
+}
+[data-slot-chart] {
+  width: 180px;
+  height: 70px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #1c1310;
+}
+[data-slot-chart] text {
+  fill: currentColor;
+}
+
+/* ---- AGI wild + mythic palette ---- */
+[data-slot-wild-label] {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 40px;
+  line-height: 1;
+  background: linear-gradient(90deg, #ff4dd2, #ffe14d, #4dffb8, #4dd2ff, #b04dff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1px rgb(0 0 0 / 0.35);
+}
+[data-slot-stage][data-palette="agi"] {
+  --body: #1a1640;
+  --body-deep: #07051a;
+  --accent: #fff3a6;
+  --accent-hot: #ff4dd2;
+  --led: #8fffe0;
+  --pattern:
+    radial-gradient(circle at 20% 30%, rgb(255 77 210 / 0.25), transparent 40%),
+    radial-gradient(circle at 80% 70%, rgb(77 210 255 / 0.25), transparent 40%);
+}
+
+/* ---- Heat telegraphs the streak ---- */
+[data-slot-heat] i {
+  height: 16px;
+}
+[data-slot-stage][data-heat="3"] [data-slot-bulbs],
+[data-slot-stage][data-heat="4"] [data-slot-bulbs] {
+  --bulb-on: radial-gradient(circle, #fff7d1 0 2px, #ff9a1a 3px, transparent 5.5px);
+  opacity: 0.85;
+}
+[data-slot-stage][data-heat="4"] [data-slot-title-kicker] {
+  color: #ffb07a;
+  font-weight: 800;
+}
+[data-slot-meter-label][data-loss] {
+  color: #ff6b6b;
+  font-weight: 800;
+}
+[data-slot-meter] {
+  transform-origin: center;
+}
+
+/* ---- Misc fixes ---- */
+[data-slot-cabinet] [data-slot-flash] {
+  inset: 0;
+  z-index: 8;
+  border-radius: inherit;
+}
+[data-slot-jester-hat] {
+  top: -26px;
+  right: -16px;
+  font-size: 44px;
+  z-index: 3;
+}
+[data-slot-marquee] {
+  overflow: visible;
+}
+[data-slot-tease-tag] {
+  animation:
+    slot-tease 350ms ease-in-out 4 alternate,
+    slot-fade-out 400ms ease-in 1.8s 1 forwards;
+}
+@keyframes slot-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+[data-slot-symbol][data-dim] {
+  filter: grayscale(0.7);
+  opacity: 0.85;
+}
+[data-slot-chart] rect[data-us] {
+  fill: #ff7a1a;
+}
+[data-slot-chart] rect[data-them] {
+  fill: #9aa0a6;
+}
+
+/* Motion blur is faked with a composited speed-line layer; filtering a 4000px strip costs frames. */
+[data-slot-reel]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  background: repeating-linear-gradient(
+    180deg,
+    rgb(255 250 240 / 0.55) 0 7px,
+    rgb(120 110 100 / 0.18) 7px 9px
+  );
+  transition: opacity 120ms;
+}
+[data-slot-reel][data-blur="1"]::before {
+  opacity: 0.45;
+}
+[data-slot-reel][data-blur="2"]::before {
+  opacity: 0.8;
+}
+/* The hot reel pulses its beam overlay's opacity (composited), not its box-shadow. */
+[data-slot-reel][data-beam]::after {
+  animation: slot-beam 300ms ease-in-out infinite alternate;
+}
+@keyframes slot-beam {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+[data-slot-rays] {
+  width: 1100px;
+  height: 1100px;
+  margin: -550px 0 0 -550px;
+}
+
+/* ---- Iteration: the loot card is dealt into the banner so the winning line stays visible ---- */
+[data-slot-loot] {
+  position: relative;
+  inset: auto;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(100%, 560px);
+  padding: 10px 16px;
+  border-radius: 14px;
+  color: #1c1310;
+  background:
+    linear-gradient(115deg, transparent 40%, rgb(255 255 255 / 0.75) 50%, transparent 60%) -200% 0 /
+      250% 100% no-repeat,
+    linear-gradient(180deg, #fffaf0, color-mix(in srgb, var(--rarity) 25%, #fffaf0));
+  box-shadow:
+    0 0 0 3px var(--rarity),
+    0 0 26px var(--rarity),
+    0 0 70px color-mix(in srgb, var(--rarity) 55%, transparent);
+  animation:
+    slot-deal-banner 480ms cubic-bezier(0.2, 1.5, 0.4, 1) 1 both,
+    slot-shine 900ms ease-out 420ms 1 both;
+}
+@keyframes slot-deal-banner {
+  0% {
+    transform: translateY(-120px) rotateX(70deg) scale(0.6);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+[data-slot-loot][data-rarity="MYTHIC"] {
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 26px #ff4dd2,
+    0 0 50px #4dd2ff,
+    0 0 90px #ffe14d;
+}
+[data-slot-loot-text] {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+[data-slot-loot] [data-slot-loot-model] {
+  font-size: 28px;
+  text-align: left;
+}
+[data-slot-loot] [data-slot-chart] {
+  width: 120px;
+  height: 48px;
+  flex-shrink: 0;
+}
+[data-slot-stamp][data-on-card] {
+  right: -14px;
+  top: -16px;
+}
+[data-slot-banner] > [data-slot-stamp] {
+  top: auto;
+  bottom: -14px;
+  right: -6px;
+}
+
+[data-slot-new] {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #2b1600;
+  background: linear-gradient(90deg, #fff1a8, #ffcc33);
+  box-shadow: 0 0 12px rgb(255 204 51 / 0.7);
+  animation: slot-punch 300ms cubic-bezier(0.2, 1.8, 0.4, 1) 1 both;
+}
+
+[data-slot-429] {
+  position: absolute;
+  inset: 22px 12px 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+  color: #fff;
+  background: rgb(120 0 16 / 0.82);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-align: center;
+  animation: slot-fade-in 120ms ease-out 1 both;
+}
+[data-slot-429] > :first-child {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 72px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+}
+[data-slot-429] > :last-child {
+  font-size: 12px;
+}
+
+[data-slot-meters] {
+  grid-template-columns: 1.3fr 1.1fr 0.7fr 0.8fr;
+}
+[data-slot-dex] {
+  font-size: 16px;
+  padding-top: 4px;
+}
+[data-slot-paytable][data-collapsed] {
+  display: none;
+}
+[data-slot-paytable-row][data-special] > :first-child {
+  font-weight: 800;
+  color: #ffe14d;
+}
+[data-slot-coins][data-front] {
+  z-index: 6;
+}
+[data-slot-quip] {
+  font-size: 15px;
+}
+
+/* ---- Photosensitivity: nothing flashes faster than about 3 Hz ---- */
+[data-slot-stage][data-phase="spinning"] [data-slot-bulbs],
+[data-slot-stage][data-hot] [data-slot-bulbs] {
+  animation-duration: 340ms;
+}
+[data-slot-stage][data-phase="result"][data-level="2"] [data-slot-bulbs],
+[data-slot-stage][data-phase="result"][data-level="3"] [data-slot-bulbs],
+[data-slot-stage][data-phase="result"][data-level="4"] [data-slot-bulbs] {
+  animation: slot-chase 340ms steps(2) 8;
+}
+[data-slot-stage][data-blackout] [data-slot-headline] {
+  animation: none;
+}
+[data-slot-payline][data-win] {
+  animation: slot-payline-flash 400ms steps(2) 4;
+}
+[data-slot-paytable-row][data-lit] {
+  animation: slot-paytable 400ms steps(2) 4;
+}
+[data-slot-tease-tag] {
+  animation:
+    slot-tease 350ms ease-in-out 4 alternate,
+    slot-fade-out 400ms ease-in 1.8s 1 forwards;
+}
+[data-slot-symbol][data-tease] {
+  animation: slot-tease 350ms ease-in-out 4 alternate;
+}
+
+[data-slot-stamp][data-on-card] {
+  top: auto;
+  bottom: -14px;
+  right: -12px;
+}
+
+/* ---- Fixed-height result slot: the loot card is dealt over the paytable ---- */
+[data-slot-result-slot] {
+  position: relative;
+  margin: 10px 0 12px;
+}
+[data-slot-result-slot] [data-slot-paytable] {
+  margin-top: 0;
+  transition: opacity 160ms;
+}
+[data-slot-paytable][data-under-card] {
+  display: grid;
+  opacity: 0;
+}
+[data-slot-result-slot] [data-slot-loot] {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  margin: 0;
+}
+[data-slot-stamp][data-on-card] {
+  top: 8px;
+  bottom: auto;
+  right: 10px;
+  transform: rotate(10deg);
+}
+[data-slot-loot] [data-slot-loot-model] {
+  font-size: 34px;
+}
+[data-slot-banner] {
+  min-height: 96px;
+  margin-bottom: 0;
+}
+[data-slot-quip] {
+  font-size: 17px;
+  max-width: 560px;
+}
+[data-slot-symbol][data-pop] {
+  animation-name: slot-pop-small;
+}
+@keyframes slot-pop-small {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.14);
+  }
+  100% {
+    transform: scale(1.03);
+  }
+}
+[data-slot-meters] {
+  grid-template-columns: 1.25fr 1.05fr 0.85fr 0.75fr;
+}
+
+/* ---- The tier tell: the pull lights up in the colour of what's coming ---- */
+[data-slot-stage][data-tell="blue"] {
+  --tell: #39b8ff;
+}
+[data-slot-stage][data-tell="purple"] {
+  --tell: #c04dff;
+}
+[data-slot-stage][data-tell="gold"] {
+  --tell: #ffcc33;
+}
+[data-slot-stage][data-tell="mythic"] {
+  --tell: #ff4dd2;
+}
+[data-slot-stage][data-tell] [data-slot-bulbs] {
+  --bulb-on: radial-gradient(circle, #fff 0 2px, var(--tell) 3px, transparent 5.5px);
+}
+[data-slot-stage][data-tell] [data-slot-lever-ball] {
+  background: radial-gradient(circle at 34% 30%, #fff 0 8%, var(--tell) 30%, #111 95%);
+  box-shadow:
+    0 0 18px var(--tell),
+    0 0 40px var(--tell);
+}
+[data-slot-stage][data-tell] [data-slot-payline] {
+  border-color: var(--tell);
+  box-shadow: 0 0 14px var(--tell);
+}
+
+/* A fixed banner height keeps the cabinet still when a big headline lands. */
+[data-slot-banner] {
+  height: 118px;
+  min-height: 0;
+  justify-content: center;
+  overflow: visible;
+}
+
+[data-slot-loot-payout] {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 22px;
+  line-height: 1;
+  color: #1a7a20;
+  -webkit-text-stroke: 0.5px rgb(0 0 0 / 0.25);
+}
+
+[data-slot-dex-meter] {
+  cursor: pointer;
+}
+[data-slot-dex-meter]:hover {
+  box-shadow:
+    inset 0 2px 6px rgb(0 0 0 / 0.9),
+    0 0 0 1px var(--led);
+}
+[data-slot-dex-panel] {
+  position: absolute;
+  inset: 22px 12px 12px;
+  z-index: 7;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgb(10 4 8 / 0.95);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+  animation: slot-fade-in 140ms ease-out 1 both;
+}
+[data-slot-dex-title] {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: var(--led);
+}
+[data-slot-dex-row] {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 9px;
+}
+[data-slot-dex-provider] {
+  color: rgb(255 244 220 / 0.75);
+  font-weight: 700;
+  padding-top: 2px;
+}
+[data-slot-dex-cells] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+[data-slot-dex-cell] {
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: rgb(255 255 255 / 0.25);
+  background: rgb(255 255 255 / 0.05);
+  white-space: nowrap;
+}
+[data-slot-dex-cell][data-found] {
+  color: #1a0d00;
+  background: var(--accent);
+  font-weight: 700;
+}
+
+/* Fit shorter viewports: the cabinet is about 960px tall unscaled. */
+@media (max-height: 1000px) {
+  [data-slot-stage] {
+    transform: scale(0.86);
+  }
+}
+@media (max-height: 860px) {
+  [data-slot-stage] {
+    transform: scale(0.74);
+  }
+}
+@media (max-height: 760px) {
+  [data-slot-stage] {
+    transform: scale(0.66);
+  }
+}
+@media (max-height: 660px) {
+  [data-slot-stage] {
+    transform: scale(0.56);
+  }
+}
+
+/* Long rumored-model names wrap instead of truncating the punchline. */
+[data-slot-model-name][data-long] {
+  font-size: 15px;
+  line-height: 1.1;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+[data-slot-dex-panel] {
+  scrollbar-width: thin;
+  scrollbar-color: var(--led) transparent;
+}
+[data-slot-dex-count] {
+  color: var(--led);
+  font-weight: 800;
+}
+
+[data-slot-loot][data-rarity="UNCOMMON"] {
+  --rarity: #3ddc6a;
+}
+[data-slot-loot][data-upgraded] {
+  animation:
+    slot-upgrade 560ms cubic-bezier(0.2, 1.6, 0.4, 1) 1 both,
+    slot-shine 900ms ease-out 300ms 1 both;
+}
+@keyframes slot-upgrade {
+  0% {
+    transform: scale(0.7) rotate(-4deg);
+    filter: brightness(3);
+  }
+  60% {
+    transform: scale(1.08) rotate(1deg);
+    filter: brightness(1.4);
+  }
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+[data-slot-perks] {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+  max-width: 190px;
+}
+[data-slot-perk] {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #1c1310;
+  background: color-mix(in srgb, var(--rarity) 35%, #fff);
+  box-shadow: 0 0 0 1px var(--rarity);
+  white-space: nowrap;
+  animation: slot-perk 380ms cubic-bezier(0.2, 1.8, 0.4, 1) 1 both;
+}
+@keyframes slot-perk {
+  0% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* The payout figure lifts off the card and flies up into the TOKENS meter. */
+[data-slot-float] {
+  position: absolute;
+  left: 30%;
+  top: 30%;
+  z-index: 9;
+  pointer-events: none;
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 30px;
+  color: var(--led);
+  text-shadow:
+    0 0 10px var(--led),
+    0 2px 0 #000;
+  opacity: 0;
+  animation: slot-float 1100ms cubic-bezier(0.4, 0, 0.6, 1) 500ms 1 both;
+}
+@keyframes slot-float {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(0, -20px) scale(1.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-90px, -560px) scale(0.6);
+  }
+}
+[data-slot-x2] {
+  position: absolute;
+  z-index: 6;
+  top: 26px;
+  right: 18px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 900;
+  font-size: 18px;
+  color: #fff;
+  background: linear-gradient(180deg, #ff9a1a, #e0101a);
+  box-shadow: 0 0 16px #ff4d1a;
+  animation: slot-punch 300ms cubic-bezier(0.2, 1.8, 0.4, 1) 1 both;
+}
+[data-slot-stage][data-on-fire] [data-slot-payline] {
+  border-color: #ff6a1a;
+  box-shadow:
+    0 0 18px #ff4d1a,
+    inset 0 0 14px rgb(255 90 20 / 0.5);
+}
+
+/* The payout is the loudest thing on the card; provider/effort details are secondary. */
+[data-slot-loot] [data-slot-loot-payout] {
+  font-size: 32px;
+  order: -1;
+}
+[data-slot-loot] [data-slot-loot-model] {
+  font-size: 24px;
+}
+[data-slot-loot] [data-slot-loot-meta] {
+  font-size: 10px;
+  opacity: 0.75;
+}
+[data-slot-dex-row] {
+  font-size: 11px;
+  grid-template-columns: 120px 1fr;
+}
+[data-slot-dex-cell] {
+  color: rgb(255 255 255 / 0.45);
+  background: rgb(255 255 255 / 0.1);
+}
+[data-slot-paytable] {
+  font-size: 12px;
+}
+
+[data-slot-loot] [data-slot-loot-rarity] {
+  order: -2;
+}
+
+[data-slot-loot] [data-slot-loot-rarity] {
+  white-space: nowrap;
+  letter-spacing: 0.12em;
+  color: #120800;
+  text-shadow: none;
+}
+[data-slot-loot] [data-slot-loot-meta] {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+[data-slot-perks] {
+  max-width: 170px;
+}
+[data-slot-perk] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The payout figure leaves from the card's left edge and arcs clear of the centred headline. */
+[data-slot-float] {
+  left: 6%;
+  top: 10%;
+  animation-name: slot-float-left;
+}
+@keyframes slot-float-left {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-30px, -10px) scale(1.15);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-70px, -260px) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-10px, -500px) scale(0.6);
+  }
+}
+[data-slot-x2] {
+  top: 2px;
+  right: auto;
+  left: 50%;
+  translate: -50% 0;
+  font-size: 13px;
+}
+
+/* ---- Jackpot takeover: one giant number owns the screen before the card is dealt ---- */
+[data-slot-overlay][data-takeover] {
+  background: rgb(0 0 0 / 0.95);
+}
+[data-slot-stage][data-takeover] [data-slot-meters],
+[data-slot-stage][data-takeover] [data-slot-banner],
+[data-slot-stage][data-takeover] [data-slot-result-slot],
+[data-slot-stage][data-takeover] [data-slot-controls] {
+  opacity: 0.12;
+  transition: opacity 200ms;
+}
+[data-slot-stage][data-takeover] [data-slot-cabinet] {
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 0 80px var(--accent),
+    0 0 180px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+[data-slot-stage][data-takeover] [data-slot-rays] {
+  opacity: 1;
+  filter: brightness(1.6);
+}
+[data-slot-giant] {
+  position: absolute;
+  inset: 22px 12px 12px;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 8px;
+  background: radial-gradient(circle, rgb(40 20 0 / 0.75), rgb(0 0 0 / 0.9));
+  pointer-events: none;
+}
+[data-slot-giant-amount] {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 92px;
+  line-height: 1;
+  color: #fff6cf;
+  -webkit-text-stroke: 3px #3a1400;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0 20px var(--accent),
+    0 0 60px var(--accent),
+    0 6px 0 #2a0a00;
+  animation: slot-giant 700ms cubic-bezier(0.2, 1.8, 0.4, 1) 1 both;
+}
+[data-slot-giant-label] {
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.5em;
+  color: var(--accent);
+  animation: slot-fade-in 300ms ease-out 200ms 1 both;
+}
+@keyframes slot-giant {
+  0% {
+    transform: scale(4) rotate(-6deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(0.92) rotate(1deg);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* Perks get their own full-width row under the payout, wrapping instead of clipping. */
+[data-slot-loot-text] [data-slot-perks] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  max-width: none;
+  margin-top: 2px;
+}
+[data-slot-loot-text] [data-slot-perk] {
+  font-size: 11px;
+  white-space: normal;
+}
+[data-slot-stage][data-palette="jester"] [data-slot-quip] {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgb(20 4 36 / 0.8);
+}
+
+/* Speed lines are dark and sparse so blurred symbols stay visible instead of a white haze. */
+[data-slot-reel]::before {
+  background: repeating-linear-gradient(180deg, rgb(30 20 14 / 0.22) 0 2px, transparent 2px 7px);
+}
+[data-slot-reel][data-blur="1"]::before {
+  opacity: 0.6;
+}
+[data-slot-reel][data-blur="2"]::before {
+  opacity: 1;
+}
+/* The takeover number sits on the top row; the winning payline stays visible beneath it. */
+[data-slot-giant] {
+  justify-content: flex-start;
+  padding-top: 2px;
+  background: linear-gradient(
+    180deg,
+    rgb(0 0 0 / 0.88) 0,
+    rgb(0 0 0 / 0.88) 31%,
+    transparent 34%,
+    transparent 66%,
+    rgb(0 0 0 / 0.7) 69%
+  );
+}
+[data-slot-giant-amount] {
+  font-size: 78px;
+  animation: none;
+}
+[data-slot-stage][data-takeover] [data-slot-banner],
+[data-slot-stage][data-takeover] [data-slot-result-slot] {
+  opacity: 0;
+}
+[data-slot-paytable-row][data-lit][data-special] > :first-child {
+  color: #120800;
+}
+[data-slot-result-slot] [data-slot-loot] {
+  justify-content: center;
+}
+[data-slot-result-slot] [data-slot-loot] [data-slot-loot-text] {
+  flex: 0 1 auto;
+}
+
+/* ---- Tiered takeovers: MEGA floods the cabinet; only JACKPOT blacks out the whole app ---- */
+[data-slot-overlay][data-takeover="3"] {
+  background: rgb(8 2 6 / 0.94);
+}
+[data-slot-stage][data-takeover="3"] [data-slot-cabinet] {
+  box-shadow:
+    0 0 0 2px #c04dff,
+    0 0 70px #c04dff,
+    0 0 150px rgb(192 77 255 / 0.5);
+}
+[data-slot-stage][data-takeover] [data-slot-banner],
+[data-slot-stage][data-takeover] [data-slot-result-slot] {
+  transition: none;
+}
+/* A one-shot sunburst behind the number, tinted per tier. Scales in once; it never spins. */
+[data-slot-giant]::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 16%;
+  width: 520px;
+  height: 520px;
+  margin: -260px 0 0 -260px;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    repeating-conic-gradient(
+      from 0deg,
+      color-mix(in srgb, var(--burst) 55%, transparent) 0 9deg,
+      transparent 9deg 22deg
+    ),
+    radial-gradient(circle, color-mix(in srgb, var(--burst) 70%, transparent), transparent 60%);
+  mask-image: radial-gradient(circle, #000 0 22%, transparent 66%);
+  animation: slot-burst 700ms cubic-bezier(0.2, 1.4, 0.4, 1) 1 both;
+}
+[data-slot-giant] {
+  isolation: isolate;
+  overflow: hidden;
+  --burst: #ffcc33;
+}
+[data-slot-stage][data-takeover="3"] [data-slot-giant] {
+  --burst: #c04dff;
+}
+[data-slot-stage][data-palette="agi"] [data-slot-giant] {
+  --burst: #ff4dd2;
+}
+[data-slot-giant-amount] {
+  width: 100%;
+  text-align: center;
+}
+[data-slot-giant-label] {
+  font-size: 16px;
+  text-shadow: 0 0 10px #000;
+}
+@keyframes slot-burst {
+  0% {
+    transform: scale(0.2) rotate(-40deg);
+    opacity: 0;
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* The winnings pile up in the tray and stay there until the next pull. */
+[data-slot-tray] {
+  position: relative;
+}
+[data-slot-pile] {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 46%;
+  height: 14px;
+  translate: -50% 0;
+  border-radius: 50% 50% 4px 4px / 100% 100% 4px 4px;
+  background:
+    radial-gradient(circle at 20% 60%, #fff3a8 0 3px, transparent 4px),
+    radial-gradient(circle at 55% 40%, #fff3a8 0 3px, transparent 4px),
+    radial-gradient(circle at 80% 65%, #fff3a8 0 3px, transparent 4px),
+    radial-gradient(circle, #ffd34d 0 5px, #b07800 6px, transparent 7px) 0 0 / 12px 9px,
+    linear-gradient(180deg, #ffcc33, #a86b00);
+  box-shadow: 0 0 14px rgb(255 204 51 / 0.6);
+  animation: slot-pile 500ms cubic-bezier(0.2, 1.6, 0.4, 1) 1 both;
+}
+[data-slot-tray][data-pile="3"] [data-slot-pile] {
+  height: 20px;
+  width: 62%;
+}
+[data-slot-tray][data-pile="4"] [data-slot-pile] {
+  height: 26px;
+  width: 80%;
+  bottom: 2px;
+}
+@keyframes slot-pile {
+  0% {
+    transform: scaleY(0);
+    transform-origin: bottom;
+  }
+  100% {
+    transform: scaleY(1);
+    transform-origin: bottom;
+  }
+}
+
+/* Readable jokes: the marquee line, kicker and meter labels carry punchlines too. */
+[data-slot-title-sub] {
+  font-size: 13px;
+  color: rgb(255 244 220 / 0.85);
+}
+[data-slot-title-kicker] {
+  font-size: 12px;
+}
+[data-slot-meter-label][data-loss] {
+  font-size: 11px;
+}
+[data-slot-quip] {
+  max-width: 470px;
+}
+[data-slot-banner] > [data-slot-stamp] {
+  bottom: auto;
+  top: -2px;
+  right: -14px;
+}
+[data-slot-stamp][data-on-card] {
+  top: auto;
+  bottom: 8px;
+  right: 10px;
+}
+[data-slot-float] {
+  left: 24%;
+  top: 0;
+}
+[data-slot-controls] {
+  grid-template-columns: 0.8fr 0.8fr 1.3fr 1.3fr;
+}
+[data-slot-button-ghost][data-on] {
+  color: #1a0d00;
+  background: linear-gradient(180deg, #fff1a8, #ffb81a);
+}
+
+/* ---- The takeover owns the lower cabinet; the reels (and payline) stay fully visible above ---- */
+[data-slot-body] {
+  position: relative;
+}
+[data-slot-giant] {
+  inset: auto;
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 392px;
+  bottom: 14px;
+  justify-content: center;
+  padding-top: 0;
+  border-radius: 12px;
+  background: radial-gradient(ellipse at 50% 40%, rgb(60 30 0 / 0.55), rgb(0 0 0 / 0.92) 75%);
+}
+[data-slot-giant]::before {
+  top: 42%;
+  width: 760px;
+  height: 760px;
+  margin: -380px 0 0 -380px;
+}
+[data-slot-giant-word] {
+  font-family: "Impact", "Haettenschweiler", "Arial Narrow Bold", system-ui, sans-serif;
+  font-size: 46px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--burst);
+  -webkit-text-stroke: 2px #2a0a00;
+  paint-order: stroke fill;
+  text-shadow: 0 0 24px var(--burst);
+  animation: slot-giant 600ms cubic-bezier(0.2, 1.8, 0.4, 1) 1 both;
+}
+[data-slot-giant-amount] {
+  font-size: 84px;
+  animation: slot-fade-in 150ms ease-out 1 both;
+}
+[data-slot-stage][data-takeover] [data-slot-controls] {
+  opacity: 0;
+}
+
+/* The payout figure rises out of the WIN meter into TOKENS, clear of every headline. */
+[data-slot-meters] {
+  position: relative;
+}
+[data-slot-meters] [data-slot-float] {
+  left: 26%;
+  top: 46px;
+  font-size: 22px;
+  animation-name: slot-float-meter;
+  animation-duration: 1200ms;
+  animation-delay: 200ms;
+}
+@keyframes slot-float-meter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-90px, -40px) scale(0.8);
+  }
+}
+[data-slot-quip] {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The tier word is solid and bright: it's the headline of the takeover, not a ghost. */
+[data-slot-giant-word] {
+  color: #fff6cf;
+  -webkit-text-stroke: 2px #3a1400;
+  text-shadow:
+    0 0 14px var(--burst),
+    0 0 40px var(--burst),
+    0 4px 0 #2a0a00;
+  font-size: 52px;
+}
+/* Card glow stays inside the slot; the stamp sits inside the card's top-right corner. */
+[data-slot-result-slot] [data-slot-loot] {
+  box-shadow:
+    0 0 0 3px var(--rarity),
+    0 0 18px var(--rarity),
+    inset 0 0 30px color-mix(in srgb, var(--rarity) 25%, transparent);
+}
+[data-slot-stamp][data-on-card] {
+  top: 6px;
+  bottom: auto;
+  right: 8px;
+  font-size: 13px;
+  transform: rotate(6deg);
+}
+@keyframes slot-stamp-card {
+  0% {
+    opacity: 0;
+    transform: rotate(-10deg) scale(3);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(6deg) scale(1);
+  }
+}
+/* The drumroll blackout gets a heartbeat on the payline row (bounded by the blackout). */
+[data-slot-stage][data-blackout] [data-slot-payline] {
+  animation: slot-heartbeat 480ms ease-in-out 3;
+}
+@keyframes slot-heartbeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  20% {
+    transform: scale(1.04);
+  }
+  40% {
+    transform: scale(1);
+  }
+  60% {
+    transform: scale(1.025);
+  }
+}
+/* Two of three heat pips: a flame edge on the cabinet, so "one more" pressure is visible. */
+[data-slot-stage][data-heat="2"]:not([data-on-fire]) [data-slot-cabinet] {
+  box-shadow:
+    0 30px 80px rgb(0 0 0 / 0.7),
+    0 0 0 2px rgb(0 0 0 / 0.6),
+    0 0 26px rgb(255 120 30 / 0.7);
+}
+
+/* Heavy takeover type: system fonts here have no Impact, so weight carries the impact. */
+[data-slot-giant-word],
+[data-slot-giant-amount] {
+  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  font-weight: 900;
+}
+[data-slot-giant-label] {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  color: #fff6cf;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.65);
+  text-shadow: none;
+}
+/* Rays turn slowly, only while the takeover is on screen (it unmounts after). */
+[data-slot-giant]::before {
+  animation:
+    slot-burst 700ms cubic-bezier(0.2, 1.4, 0.4, 1) 1 both,
+    slot-rays-turn 4s linear 1;
+}
+@keyframes slot-rays-turn {
+  to {
+    rotate: 30deg;
+  }
+}
+/* The meters stay lit through a takeover: they climb with the giant number, no empty band. */
+[data-slot-stage][data-takeover] [data-slot-meters] {
+  opacity: 1;
+}
+[data-slot-nearmiss] {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 26%;
+  translate: -50% 0;
+  padding: 4px 18px;
+  border: 4px double #d8102a;
+  border-radius: 10px;
+  color: #d8102a;
+  background: rgb(255 250 240 / 0.92);
+  font-family: system-ui, sans-serif;
+  font-weight: 900;
+  font-size: 30px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: rotate(-6deg);
+  animation: slot-nearmiss 420ms cubic-bezier(0.2, 1.6, 0.4, 1) 1 both;
+}
+@keyframes slot-nearmiss {
+  0% {
+    opacity: 0;
+    transform: rotate(-20deg) scale(3);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(-6deg) scale(1);
+  }
+}
+[data-slot-meter-label][data-loss] {
+  font-size: 13px;
+  text-shadow: 0 0 8px rgb(255 60 60 / 0.8);
+}
+
+/* The rolling card: model names flicker past behind a speed blur, then the real card lands. */
+[data-slot-loot][data-rolling] {
+  justify-content: center;
+  filter: saturate(0.6);
+  animation: none;
+}
+[data-slot-loot][data-rolling] [data-slot-loot-model] {
+  font-size: 30px;
+  opacity: 0.8;
+}
+/* Near-miss stamp sits below the payline so the teased symbol above it stays visible. */
+[data-slot-nearmiss] {
+  top: auto;
+  bottom: 6%;
+}
+/* BIG wins sweep a light band along the payline once. */
+[data-slot-stage][data-level="2"] [data-slot-payline][data-win]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.8) 50%, transparent 70%)
+    -100% 0 / 60% 100% no-repeat;
+  animation: slot-sweep 800ms ease-out 2;
+}
+@keyframes slot-sweep {
+  to {
+    background-position: 200% 0;
+  }
+}
+/* The roll is a real card whose rarity border climbs; the dealt card punches in where it stood. */
+[data-slot-loot][data-rolling] {
+  justify-content: flex-start;
+  filter: none;
+  transition: box-shadow 90ms;
+}
+[data-slot-loot][data-rolling] [data-slot-loot-model] {
+  opacity: 0.85;
+}
+[data-slot-loot][data-from-roll]:not([data-upgraded]) {
+  animation:
+    slot-upgrade 420ms cubic-bezier(0.2, 1.6, 0.4, 1) 1 both,
+    slot-shine 900ms ease-out 200ms 1 both;
+}
+/* The Codex stall is the joke, so it gets the stage: dimmed count, big centred bill. */
+[data-slot-giant][data-stalled] [data-slot-giant-amount] {
+  filter: grayscale(1) brightness(0.7);
+}
+[data-slot-giant-label][data-stall] {
+  max-width: 92%;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 21px;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  color: #e9dcff;
+  background: rgb(20 0 40 / 0.85);
+  border: 2px solid #b48cff;
+  border-radius: 10px;
+  padding: 6px 14px;
+}
+/* Near-miss stamp hangs off the bottom bezel so no reel symbol is covered. */
+[data-slot-nearmiss] {
+  bottom: -20px;
+  font-size: 24px;
+}
+/* The near-miss stamp is the headline itself, so it never covers a reel or the quip. */
+[data-slot-banner] [data-slot-nearmiss] {
+  position: relative;
+  inset: auto;
+  translate: none;
+  font-size: 30px;
+}
+[data-slot-banner] [data-slot-nearmiss] {
+  margin: 2px 0 10px;
+}
+/* The banked amount flies as a chip, so it never reads as ghost digits over the meter. */
+[data-slot-float] {
+  padding: 2px 10px;
+  border: 2px solid var(--led);
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.85);
+}
+[data-slot-meter-label] {
+  white-space: nowrap;
+}
+[data-slot-meter-label][data-loss] {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+[data-slot-jester-hat] {
+  top: -22px;
+  right: 6px;
+}
+/* The jester pattern stays on the cabinet; the rules sit on an opaque panel to stay legible. */
+[data-slot-stage][data-palette="jester"] [data-slot-paytable] {
+  background: rgb(14 4 24 / 0.94);
+}
+/* Card text reads at a glance: deep green total, solid metadata. */
+[data-slot-loot] [data-slot-loot-payout] {
+  color: #0d5c12;
+}
+[data-slot-loot] [data-slot-loot-meta] {
+  opacity: 1;
+  color: rgb(28 19 16 / 0.85);
+}
+/* The banked pill rises from the reels and fades before it reaches the meters it would cover. */
+[data-slot-float] {
+  left: 50%;
+  top: 36%;
+  translate: -50% 0;
+  animation-name: slot-float-rise;
+}
+@keyframes slot-float-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.2);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-40px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-80px) scale(0.9);
+  }
+}
+/* The loot card is the treasure, not app chrome: dark foil lit by its rarity. */
+[data-slot-loot] {
+  color: #fff6e0;
+  background:
+    linear-gradient(115deg, transparent 40%, rgb(255 255 255 / 0.35) 50%, transparent 60%) -200% 0 /
+      250% 100% no-repeat,
+    radial-gradient(
+      circle at 12% 50%,
+      color-mix(in srgb, var(--rarity) 40%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(160deg, #1d1424, color-mix(in srgb, var(--rarity) 14%, #0e0812));
+}
+[data-slot-loot] [data-slot-loot-payout] {
+  color: #8dff9a;
+}
+[data-slot-loot] [data-slot-loot-model] {
+  color: #fff6e0;
+}
+[data-slot-loot] [data-slot-loot-meta] {
+  color: rgb(255 246 224 / 0.8);
+}
+[data-slot-loot] > svg:first-child,
+[data-slot-loot] > [data-slot-provider-icon] {
+  filter: drop-shadow(0 0 10px var(--rarity));
+}
+/* The prize itself sits under the giant number, so the celebration is about the model you won. */
+[data-slot-giant-model] {
+  font-family: system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff6cf;
+  text-shadow: 0 2px 6px #000;
+}
+/* JACKPOT breaks the frame: the takeover rises over the reels with a bigger number (one-shot). */
+[data-slot-giant] {
+  transition: top 280ms cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+[data-slot-giant][data-slot-broken-out] {
+  top: 14px;
+  box-shadow:
+    0 0 0 3px var(--burst),
+    0 0 60px var(--burst);
+}
+[data-slot-giant][data-slot-broken-out] [data-slot-giant-amount] {
+  font-size: 86px;
+}
+[data-slot-giant][data-slot-broken-out] [data-slot-giant-word] {
+  font-size: 56px;
+  white-space: nowrap;
+}
+/* The model you won is the prize: it leads the card, the total supports it, the details read. */
+[data-slot-loot] [data-slot-loot-model] {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.05;
+}
+[data-slot-loot] [data-slot-loot-payout] {
+  order: 0;
+  font-size: 22px;
+}
+[data-slot-loot] [data-slot-loot-meta] {
+  font-size: 13px;
+}
+[data-slot-loot] [data-slot-loot-rarity] {
+  font-size: 12px;
+}
+/* Broken out, the takeover fully covers the reels so nothing ghosts behind the number. */
+[data-slot-giant][data-slot-broken-out] {
+  background: radial-gradient(ellipse at 50% 40%, rgb(60 30 0 / 0.9), rgb(0 0 0 / 0.98) 75%);
+}
