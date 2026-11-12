@@ -1,0 +1,13 @@
+@import "../src/index.css";
+@source "../src/components/chat/slotMachine";
+@source "../src/components/chat/ProviderInstanceIcon.tsx";
+@source "../src/components/chat/ProviderPackageIcon.tsx";
+@source "../src/components/Icons.tsx";
+@source "../src/components/settings/providerDriverMeta.ts";
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #0d0a10;
+}
