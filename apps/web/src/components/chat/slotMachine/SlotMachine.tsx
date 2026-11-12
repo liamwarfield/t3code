@@ -628,6 +628,24 @@ export default function SlotMachine(props: {
     return audioRef.current;
   };
 
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- fits the cabinet to the window, which React doesn't observe.
+  useEffect(() => {
+    const fit = () => {
+      const stage = rootRef.current;
+      if (!stage) return;
+      // offsetWidth/Height ignore transforms, so this reads the unscaled cabinet.
+      const scale = Math.min(
+        1,
+        (window.innerWidth - 16) / Math.max(1, stage.offsetWidth),
+        (window.innerHeight - 16) / Math.max(1, stage.offsetHeight),
+      );
+      stage.style.setProperty("--slot-fit", scale.toFixed(3));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- owns the AudioContext, rAF loops and canvas, which outlive renders.
   useEffect(() => {
     const canvas = canvasRef.current;

@@ -30,13 +30,6 @@
   align-items: center;
   gap: 0;
   outline: none;
-  transform: scale(min(1, calc((100vw - 32px) / 760px)), min(1, calc((100vw - 32px) / 760px)));
-}
-
-@media (max-height: 860px) {
-  [data-slot-stage] {
-    transform: scale(0.82);
-  }
 }
 
 [data-slot-stage][data-palette="jester"] {
@@ -1632,26 +1625,6 @@
 }
 
 /* Fit shorter viewports: the cabinet is about 960px tall unscaled. */
-@media (max-height: 1000px) {
-  [data-slot-stage] {
-    transform: scale(0.86);
-  }
-}
-@media (max-height: 860px) {
-  [data-slot-stage] {
-    transform: scale(0.74);
-  }
-}
-@media (max-height: 760px) {
-  [data-slot-stage] {
-    transform: scale(0.66);
-  }
-}
-@media (max-height: 660px) {
-  [data-slot-stage] {
-    transform: scale(0.56);
-  }
-}
 
 /* Long rumored-model names wrap instead of truncating the punchline. */
 [data-slot-model-name][data-long] {
@@ -2597,4 +2570,12 @@
 [data-slot-banned-reason] {
   font-size: 12px;
   color: rgb(255 233 230 / 0.75);
+}
+/* The stage scales to fit the viewport's width and height (set from SlotMachine.tsx), so phones see it whole. */
+[data-slot-stage] {
+  /* Centered on its own box: grid centering offsets a box wider than a phone screen. */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(var(--slot-fit, 1));
 }
