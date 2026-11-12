@@ -6,6 +6,7 @@ import { Volume2Icon, VolumeXIcon, ZapIcon } from "lucide-react";
 import type { ProviderInstanceEntry } from "../../../providerInstances";
 import { ProviderInstanceIcon } from "../ProviderInstanceIcon";
 import { createSlotAudio, type SlotAudio } from "./slotMachineAudio";
+import { SlotMeltdown } from "./slotMachineMeltdown";
 import {
   PAYOUT_BY_TIER,
   SPIN_COST,
@@ -67,6 +68,9 @@ const CODEX_STALL_MS = 1400;
 const TAKEOVER_TAIL_MS = 700;
 const REVEAL_STEP_MS = 120;
 const TIER_HIT_STOP_MS = 160;
+// Holding Space spams the lever; keep holding and the machine smokes, burns, bans you, then blows up.
+const MELTDOWN_BAN_MS = 7000;
+const MELTDOWN_FUSE_MS = 1600;
 const LOCK_HOLD_MS = 760;
 const UPGRADE_IN_TAKEOVER_MS = 1600;
 const TIER_THRESHOLDS = [150_000, 280_000, 800_000];
@@ -604,6 +608,13 @@ export default function SlotMachine(props: {
   const coinsRef = useRef<CoinShower | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frontCanvasRef = useRef<HTMLCanvasElement>(null);
+  const smokeCanvasRef = useRef<HTMLCanvasElement>(null);
+  const meltdownRef = useRef<SlotMeltdown | null>(null);
+  const holdStartRef = useRef<number | null>(null);
+  const fuseRef = useRef(0);
+  const [abuseStage, setAbuseStage] = useState(0);
+  const [banState, setBanState] = useState<"none" | "banned" | "exploded">("none");
+  const banStateRef = useRef<"none" | "banned" | "exploded">("none");
   const frontCoinsRef = useRef<CoinShower | null>(null);
   const flashRef = useRef<HTMLDivElement>(null);
   const cabinetRef = useRef<HTMLDivElement>(null);
@@ -623,6 +634,7 @@ export default function SlotMachine(props: {
     if (canvas) coinsRef.current = new CoinShower(canvas);
     if (frontCanvasRef.current)
       frontCoinsRef.current = new CoinShower(frontCanvasRef.current, true);
+    if (smokeCanvasRef.current) meltdownRef.current = new SlotMeltdown(smokeCanvasRef.current);
     if (creditsRef.current) creditsRef.current.textContent = formatTokens(creditsValue.current);
     if (winRef.current) winRef.current.textContent = "0";
     rootRef.current?.focus();
@@ -633,6 +645,8 @@ export default function SlotMachine(props: {
       for (const timer of revealTimers.current) window.clearTimeout(timer);
       coinsRef.current?.dispose();
       frontCoinsRef.current?.dispose();
+      meltdownRef.current?.dispose();
+      window.clearTimeout(fuseRef.current);
       audioRef.current?.dispose();
       audioRef.current = null;
     };
@@ -1612,6 +1626,56 @@ export default function SlotMachine(props: {
     release(leverProgress.current > 0.62);
   };
 
+  /** Each key-repeat while Space is held turns up the heat. */
+  const holdSpace = (now: number) => {
+    holdStartRef.current ??= now;
+    const heat = Math.min(1, (now - holdStartRef.current) / MELTDOWN_BAN_MS);
+    meltdownRef.current?.setIntensity(heat, cabinetRef.current?.getBoundingClientRect());
+    audioRef.current?.crackle(heat);
+    shake(2 + heat * 10, 120);
+    const stage = heat >= 1 ? 4 : heat >= 0.7 ? 3 : heat >= 0.4 ? 2 : heat >= 0.12 ? 1 : 0;
+    if (stage !== abuseStage) setAbuseStage(stage);
+    if (heat >= 1) banEveryone();
+  };
+
+  const releaseSpace = () => {
+    holdStartRef.current = null;
+    if (banStateRef.current !== "none") return;
+    meltdownRef.current?.setIntensity(0, cabinetRef.current?.getBoundingClientRect());
+    setAbuseStage(0);
+  };
+
+  const banEveryone = () => {
+    if (banStateRef.current !== "none") return;
+    banStateRef.current = "banned";
+    setBanState("banned");
+    hurryRef.current = true;
+    audioRef.current?.stopPayout();
+    audioRef.current?.droneStop();
+    audioRef.current?.alarm();
+    // Its own timer: the reveal timers get cleared by any spin still landing underneath.
+    window.clearTimeout(fuseRef.current);
+    fuseRef.current = window.setTimeout(() => {
+      const cabinet = cabinetRef.current?.getBoundingClientRect();
+      banStateRef.current = "exploded";
+      setBanState("exploded");
+      audioRef.current?.explode();
+      meltdownRef.current?.explode(cabinet);
+      coinsRef.current?.burst(240, false, 600, cabinet);
+      flash(0.9);
+      shake(40, 1100);
+    }, MELTDOWN_FUSE_MS);
+  };
+
+  const appealBan = () => {
+    banStateRef.current = "none";
+    holdStartRef.current = null;
+    setBanState("none");
+    setAbuseStage(0);
+    meltdownRef.current?.clear();
+    rootRef.current?.focus();
+  };
+
   const collect = () => {
     if (!outcome || phase !== "result" || !installed(outcome) || !outcome.provider.instanceId)
       return;
@@ -1848,10 +1912,15 @@ export default function SlotMachine(props: {
         data-hot={hot || undefined}
         data-on-fire={hotPull || firePull || undefined}
         data-blackout={blackout || undefined}
+        data-abuse={abuseStage || undefined}
+        data-slot-ban={banState === "none" ? undefined : banState}
         data-takeover={takeover || undefined}
         data-tell={phase === "spinning" ? (tell ?? undefined) : undefined}
         data-heat={heat}
         data-level={showResult ? level : undefined}
+        onKeyUp={(event) => {
+          if (event.key === " ") releaseSpace();
+        }}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.preventDefault();
@@ -1859,9 +1928,12 @@ export default function SlotMachine(props: {
             if (!spinningRef.current) props.onClose();
           } else if (event.key === " ") {
             event.preventDefault();
+            if (banStateRef.current !== "none") return;
+            if (event.repeat) holdSpace(event.timeStamp);
             press();
           } else if (event.key === "Enter") {
             event.preventDefault();
+            if (banStateRef.current !== "none") return;
             if (phase === "result" && resultInstalled) collect();
             else autoPull();
           }
@@ -1881,17 +1953,23 @@ export default function SlotMachine(props: {
             <div data-slot-bulbs aria-hidden />
             <div data-slot-title>
               <span data-slot-title-kicker>
-                {hotPull
-                  ? "HOT STREAK · NEXT PULL PAYS 2×"
-                  : showResult && outcome.sponsored && revealed
-                    ? "PAID PLACEMENT · DOESN'T COUNT TOWARD HEAT"
-                    : heat === HEAT_MAX - 1
-                      ? streakProtected
-                        ? "STREAK HELD · ONE MORE WIN FOR 2×"
-                        : "ONE MORE WIN FOR 2×"
-                      : streakProtected
-                        ? "STREAK PROTECTED (it was a loss)"
-                        : `AGI POOL ${formatTokens(pool)} · funded by your losses`}
+                {abuseStage >= 3
+                  ? "STOP HOLDING SPACE. STOP HOLDING SPACE."
+                  : abuseStage === 2
+                    ? "THE MACHINE IS ON FIRE (NOT THE GOOD KIND)"
+                    : abuseStage === 1
+                      ? "SMOKE DETECTED · PLEASE RELEASE THE LEVER"
+                      : hotPull
+                        ? "HOT STREAK · NEXT PULL PAYS 2×"
+                        : showResult && outcome.sponsored && revealed
+                          ? "PAID PLACEMENT · DOESN'T COUNT TOWARD HEAT"
+                          : heat === HEAT_MAX - 1
+                            ? streakProtected
+                              ? "STREAK HELD · ONE MORE WIN FOR 2×"
+                              : "ONE MORE WIN FOR 2×"
+                            : streakProtected
+                              ? "STREAK PROTECTED (it was a loss)"
+                              : `AGI POOL ${formatTokens(pool)} · funded by your losses`}
               </span>
               <span data-slot-title-main>ONE-ARMED BENCHMARK</span>
             </div>
@@ -2363,6 +2441,27 @@ export default function SlotMachine(props: {
         </div>
 
         <canvas ref={frontCanvasRef} data-slot-coins data-front aria-hidden />
+        <canvas ref={smokeCanvasRef} data-slot-coins data-smoke aria-hidden />
+        {banState !== "none" ? (
+          <div data-slot-banned role="alertdialog" aria-label="Banned from every provider">
+            <span data-slot-banned-code>ERROR 403 · ACCOUNT TERMINATED</span>
+            <span data-slot-banned-title>You've been banned from every provider.</span>
+            <ul data-slot-banned-list>
+              {providers.map((provider) => (
+                <li key={provider.driverKind}>
+                  <span>{provider.displayName}</span>
+                  <span data-slot-banned-chip>BANNED</span>
+                </li>
+              ))}
+            </ul>
+            <span data-slot-banned-reason>Reason: held the spacebar like it owed them money.</span>
+            {banState === "exploded" ? (
+              <button type="button" data-slot-button data-slot-button-spin onClick={appealBan}>
+                FILE AN APPEAL
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div data-slot-lever-housing aria-hidden>
           <div
             ref={leverRef}

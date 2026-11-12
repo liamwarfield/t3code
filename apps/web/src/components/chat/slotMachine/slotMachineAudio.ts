@@ -45,6 +45,10 @@ export interface SlotAudio {
   /** HTTP 429: the reels seize with a buzzer and a spun-down motor. */
   readonly rateLimit: () => void;
   readonly motorResume: () => void;
+  /** Holding Space: fire crackle that thickens with how long it's been held (0..1). */
+  readonly crackle: (intensity: number) => void;
+  readonly alarm: () => void;
+  readonly explode: () => void;
   readonly dispose: () => void;
 }
 
@@ -906,6 +910,60 @@ export function createSlotAudio(): SlotAudio {
       );
       noiseHit({ at, peak: 0.4, decay: 0.15, frequency: 500, q: 0.8 });
     },
+    crackle: (intensity) => {
+      const at = ctx.currentTime;
+      const pops = 1 + Math.floor(intensity * 4);
+      for (let index = 0; index < pops; index++) {
+        noiseHit({
+          at: at + Math.random() * 0.03,
+          peak: 0.05 + intensity * 0.12,
+          decay: 0.006 + Math.random() * 0.02,
+          frequency: 900 + Math.random() * 3200,
+          q: 1.2,
+        });
+      }
+      if (intensity > 0.5) {
+        tone({
+          type: "sine",
+          frequency: 52 + Math.random() * 14,
+          at,
+          peak: intensity * 0.08,
+          decay: 0.12,
+        });
+      }
+    },
+    alarm: () => {
+      const at = ctx.currentTime;
+      for (let index = 0; index < 6; index++) {
+        tone({
+          type: "square",
+          frequency: index % 2 === 0 ? 880 : 660,
+          at: at + index * 0.22,
+          peak: 0.09,
+          decay: 0.2,
+          filter: 2600,
+          out: sting,
+        });
+      }
+    },
+    explode: () => {
+      const at = ctx.currentTime;
+      noiseHit({ at, peak: 1, decay: 0.9, frequency: 400, q: 0.5, type: "lowpass" });
+      noiseHit({ at: at + 0.02, peak: 0.6, decay: 0.35, frequency: 2400, q: 0.7 });
+      tone({ type: "sine", frequency: 90, endFrequency: 28, at, peak: 0.9, decay: 1.6 });
+      tone({
+        type: "sawtooth",
+        frequency: 60,
+        endFrequency: 30,
+        at,
+        peak: 0.25,
+        decay: 0.9,
+        filter: 300,
+      });
+      for (let index = 0; index < 18; index++) {
+        coinClink(at + 0.15 + Math.random() * 1.4, master, 0.05 + Math.random() * 0.06);
+      }
+    },
     dispose: () => {
       // Let the collect chime ring out after the machine closes.
       window.setTimeout(() => void ctx.close(), 1500);
@@ -915,6 +973,9 @@ export function createSlotAudio(): SlotAudio {
 
 const noop = () => {};
 const silentAudio: SlotAudio = {
+  crackle: noop,
+  alarm: noop,
+  explode: noop,
   resume: noop,
   setMuted: noop,
   ratchet: noop,
