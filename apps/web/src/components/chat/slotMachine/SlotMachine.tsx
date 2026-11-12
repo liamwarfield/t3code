@@ -1,6 +1,7 @@
 import type { ProviderDriverKind, ProviderInstanceId } from "@t3tools/contracts";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal, flushSync } from "react-dom";
+import { Volume2Icon, VolumeXIcon, ZapIcon } from "lucide-react";
 
 import type { ProviderInstanceEntry } from "../../../providerInstances";
 import { ProviderInstanceIcon } from "../ProviderInstanceIcon";
@@ -72,22 +73,14 @@ const TIER_THRESHOLDS = [150_000, 280_000, 800_000];
 // The takeover headline climbs with the count; the last threshold reveals the real word.
 const GIANT_WORDS = ["BIG WIN", "MEGA WIN"];
 const DEX_COMPLETE_BONUS = 100_000;
-const MARQUEE_LINES = [
-  "vibes-based model selection · est. 2026",
-  "now with 2× usage limits* (*for 2 hours)",
-  "SWE-bench verified™ (by us)",
-  "slop detected · proceeding anyway",
-  "results not reproducible · odds not audited",
-];
+const PAYTABLE_RULES: Record<PayoutTier, string> = {
+  jackpot: "★★★ model at top effort",
+  mega: "one step short",
+  big: "two steps short",
+  win: "three steps short",
+  slop: "anything less",
+};
 const STATE_KEY = "t3code:slot-machine-state";
-const PERKS = [
-  "+1 retry (no refunds)",
-  "context ×2 (until compaction)",
-  "rate-limit immunity (expired)",
-  "free compute weekend (terms apply)",
-  "priority queue (position 4,812)",
-  "early access (waitlist)",
-];
 // The roll climbs this ladder like VS beam colours, settling on the real pre-upgrade rarity.
 const ROLL_LADDER = ["UNCOMMON", "RARE", "EPIC", "LEGENDARY"] as const;
 const ROLL_TICKS = 5;
@@ -555,7 +548,6 @@ export default function SlotMachine(props: {
   const [firePull, setFirePull] = useState(false);
   // Some big wins deal one rarity low, then crack and re-deal the real one.
   const [rarityUpgrade, setRarityUpgrade] = useState(false);
-  const [perkCount, setPerkCount] = useState(0);
   const [takeover, setTakeover] = useState(0);
   const [floatText, setFloatText] = useState("");
   const [freeSpin, setFreeSpin] = useState(false);
@@ -835,11 +827,10 @@ export default function SlotMachine(props: {
   };
 
   /** The chest beat: each payline symbol pops forward in turn, then the loot card is dealt. */
-  const runReveal = (level: number, perks: number, offsetMs: number) => {
+  const runReveal = (level: number, offsetMs: number) => {
     clearRevealTimers();
     if (level < 2) return;
     const cardAt = offsetMs + 3 * REVEAL_STEP_MS + 150;
-    const perksAt = cardAt + 700;
     // The VS item roll: candidate cards flicker past, slowing down, before the real card lands.
     const rollDelays = [90, 110, 140, 180, 230];
     let rollAt = cardAt - rollDelays.reduce((sum, delay) => sum + delay, 0);
@@ -854,9 +845,6 @@ export default function SlotMachine(props: {
       );
       rollAt += delay;
     });
-    for (let index = 0; index < perks; index++) {
-      revealTimers.current.push(window.setTimeout(() => popWithDuck(index), perksAt + index * 320));
-    }
     [0, 1, 2, 3].forEach((index) => {
       revealTimers.current.push(
         window.setTimeout(
@@ -944,7 +932,6 @@ export default function SlotMachine(props: {
     reachedHotStreak: boolean;
     discovered: boolean;
     heatRose: boolean;
-    perks: number;
     baseAfter: number;
     bonus: number;
     pricingCut: number;
@@ -986,7 +973,7 @@ export default function SlotMachine(props: {
     // runReveal resets the reveal timers, so the takeover's end is scheduled after it.
     // Outside a takeover the card lands as the count does, never ahead of the meter.
     const revealOffsetMs = takeoverMs || Math.max(0, durationMs - 3 * REVEAL_STEP_MS - 150);
-    runReveal(result.agi ? 4 : level, input.perks, revealOffsetMs);
+    runReveal(result.agi ? 4 : level, revealOffsetMs);
     // The banked pill waits for the count to land, so it never announces the total early.
     setFloatDelayMs(
       (takeoverMs || durationMs) + (codexStalls && takeoverMs === 0 ? CODEX_STALL_MS : 0),
@@ -1160,7 +1147,7 @@ export default function SlotMachine(props: {
         setFloatDelayMs(500);
         setFloatText(`+${formatTokens(next.amount)} BONUS`);
         // The bonus climb announces its cause before it counts.
-        if (giantWordRef.current) giantWordRef.current.textContent = "⬆ UPGRADE +25%";
+        if (giantWordRef.current) giantWordRef.current.textContent = "UPGRADE +25%";
       } else {
         setCompletedProvider(result.provider.displayName);
       }
@@ -1256,9 +1243,7 @@ export default function SlotMachine(props: {
     });
     const blackout = canCollect && level === 4;
     const upgrade = canCollect && bonus > 0;
-    const perks = !canCollect ? 0 : result.agi ? 3 : level === 4 ? 2 : level === 3 ? 1 : 0;
     setRarityUpgrade(upgrade);
-    setPerkCount(perks);
     setHot(false);
     setTeasing(false);
     setBeam(0);
@@ -1287,7 +1272,6 @@ export default function SlotMachine(props: {
           reachedHotStreak,
           discovered,
           heatRose: heatRef.current > heatBefore,
-          perks,
           baseAfter: before + earnedBase,
           bonus,
           pricingCut,
@@ -1770,12 +1754,6 @@ export default function SlotMachine(props: {
         Math.max(1, ROLL_LADDER.indexOf(shownRarity as (typeof ROLL_LADDER)[number])),
       )
     ] ?? "LEGENDARY";
-  const perkLabels = showResult
-    ? Array.from(
-        { length: perkCount },
-        (_, index) => PERKS[(outcome.quipSeed + index) % PERKS.length]!,
-      )
-    : [];
   const limitRemaining =
     limitSince === null ? 0 : Math.max(0, 5 * 3600 - Math.floor((now - limitSince) / 1000));
   const limitClock = `${Math.floor(limitRemaining / 3600)}:${String(
@@ -1810,19 +1788,19 @@ export default function SlotMachine(props: {
       ? "Remaining payout arriving in the coming weeks…"
       : outOfTokens
         ? waitedOut
-          ? "Still waiting? Respect. (Or $8/mo at t3.chat, but that's a different app.)"
-          : "You're out of tokens. They reset in 5 hours. Or you could simply give us $200."
+          ? "Still waiting? Respect. (Or $8/mo at t3.chat.)"
+          : "Out of tokens. Resets in 5 hours, or $200 now."
         : upgraded && phase !== "spinning"
-          ? "Tokens refilled. Limits may still apply. Limits will always apply."
+          ? "Tokens refilled. Limits still apply."
           : showResult
             ? slotQuip(outcome, resultInstalled)
             : phase === "spinning"
               ? hot
-                ? "Something's happening on reel three..."
-                : "Reels are hot. Fortune favors the vibe coder."
+                ? ""
+                : ""
               : hotPull
-                ? "Heat maxed. Next pull pays double and the reels know it."
-                : "Drag the lever, or press Space. Collect with Enter.";
+                ? "Next pull pays double."
+                : "Space to pull · Enter to collect";
   const stamp = rawStamp && rawStamp !== headline ? rawStamp : null;
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- ticks the reasoning-token bill only while Codex's stall is on screen.
@@ -1893,15 +1871,14 @@ export default function SlotMachine(props: {
             <div data-slot-title>
               <span data-slot-title-kicker>
                 {hotPull
-                  ? "🔥 HOT STREAK · NEXT PULL PAYS x2 🔥"
+                  ? "HOT STREAK · NEXT PULL PAYS 2×"
                   : streakProtected
                     ? "STREAK PROTECTED (it was a loss)"
                     : heat === HEAT_MAX - 1
-                      ? "⚠ ONE MORE WIN FOR 🔥 ON FIRE ⚠"
+                      ? "ONE MORE WIN FOR 2×"
                       : `AGI POOL ${formatTokens(pool)} · funded by your losses`}
               </span>
               <span data-slot-title-main>ONE-ARMED BENCHMARK</span>
-              <span data-slot-title-sub>{MARQUEE_LINES[pullCount % MARQUEE_LINES.length]}</span>
             </div>
             {palette === "jester" ? (
               <div data-slot-jester-hat aria-hidden>
@@ -1958,7 +1935,7 @@ export default function SlotMachine(props: {
                   }
                 }}
               >
-                <span data-slot-meter-label>DEX ▾</span>
+                <span data-slot-meter-label>DEX</span>
                 <span data-slot-meter-value data-slot-dex>
                   {dex.length}/{totalCombos}
                 </span>
@@ -2178,12 +2155,12 @@ export default function SlotMachine(props: {
               <span data-slot-quip>{quip}</span>
               {completedProvider ? (
                 <span data-slot-new>
-                  🏆 {completedProvider.toUpperCase()} DEX COMPLETE · +
+                  {completedProvider.toUpperCase()} DEX COMPLETE · +
                   {formatTokens(DEX_COMPLETE_BONUS)}
                 </span>
               ) : null}
               {discovered && revealed && !lootCard && !nearMissShown ? (
-                <span data-slot-new>✨ NEW IN YOUR DEX</span>
+                <span data-slot-new>NEW IN DEX</span>
               ) : null}
               {stamp && !lootCard && !willDealLoot && outcome?.nearMissReel == null ? (
                 <div data-slot-stamp key={`${stamp}-${outcome?.quipSeed}`} aria-hidden>
@@ -2233,17 +2210,7 @@ export default function SlotMachine(props: {
                     }
                   >
                     <span>{tier === "slop" ? "SLOP" : tier.toUpperCase()}</span>
-                    <span data-slot-paytable-combo>
-                      {tier === "jackpot"
-                        ? "★★★ + 🔥"
-                        : tier === "mega"
-                          ? "★★★ + high · ★★ + 🔥"
-                          : tier === "big"
-                            ? "★★★ + med · ★★ + high · ★ + 🔥"
-                            : tier === "win"
-                              ? "★★★ + low · ★★ + med · ★ + high"
-                              : "anything less"}
-                    </span>
+                    <span data-slot-paytable-combo>{PAYTABLE_RULES[tier]}</span>
                     <span>{formatTokens(PAYOUT_BY_TIER[tier])}</span>
                   </div>
                 ))}
@@ -2278,31 +2245,16 @@ export default function SlotMachine(props: {
                   />
                   <div data-slot-loot-text>
                     <span data-slot-loot-rarity>
-                      {rarityUpgrade && revealStep >= 5 ? "⬆ UPGRADED · " : ""}
+                      {rarityUpgrade && revealStep >= 5 ? "UPGRADED · " : ""}
                       {shownRarity}
-                      {discovered ? " · ✨ NEW" : ""}
+                      {discovered ? " · NEW" : ""}
                     </span>
                     <span data-slot-loot-model>{outcome.model.name}</span>
                     <span data-slot-loot-payout>+{formatTokens(earnedShown)} tokens</span>
                     <span data-slot-loot-meta>
                       {outcome.provider.displayName} · {"★".repeat(outcome.model.tier)} ·{" "}
-                      {outcome.effort.label} effort · ⏎ to equip
+                      {outcome.effort.label} effort
                     </span>
-                    {perkLabels.length > 0 ? (
-                      <span data-slot-perks>
-                        {perkLabels.map((perk, index) => (
-                          <span
-                            key={perk}
-                            data-slot-perk
-                            style={{
-                              animationDelay: `${(rarityUpgrade ? 1500 : 700) + index * 320}ms`,
-                            }}
-                          >
-                            + {perk}
-                          </span>
-                        ))}
-                      </span>
-                    ) : null}
                   </div>
                   {outcome.benchmaxxed ? (
                     <svg data-slot-chart viewBox="0 0 180 70" aria-hidden>
@@ -2345,10 +2297,12 @@ export default function SlotMachine(props: {
                   setTurbo(turboRef.current);
                 }}
               >
-                ⚡ {turbo ? "TURBO ON" : "TURBO"}
+                <ZapIcon aria-hidden />
+                TURBO
               </button>
               <button type="button" data-slot-button data-slot-button-ghost onClick={toggleMute}>
-                {muted ? "🔇 Unmute" : "🔊 Mute"}
+                {muted ? <VolumeXIcon aria-hidden /> : <Volume2Icon aria-hidden />}
+                {muted ? "UNMUTE" : "MUTE"}
               </button>
               <button
                 type="button"
@@ -2361,7 +2315,7 @@ export default function SlotMachine(props: {
                   ? "UPGRADE TO MAX · $200"
                   : freeSpin
                     ? "SPIN · FREE"
-                    : `${hotPull ? "🔥 SPIN x2" : "SPIN"} −${SPIN_COST / 1000}K`}
+                    : `${hotPull ? "SPIN 2×" : "SPIN"} −${SPIN_COST / 1000}K`}
               </button>
               {outOfTokens ? (
                 <button
@@ -2370,7 +2324,7 @@ export default function SlotMachine(props: {
                   data-slot-button-ghost
                   onClick={() => setWaitedOut(true)}
                 >
-                  ⏳ WAIT {limitClock}
+                  WAIT {limitClock}
                 </button>
               ) : (
                 <button
@@ -2381,7 +2335,7 @@ export default function SlotMachine(props: {
                   // A free spin isn't a dead end: the button pulls again instead of collecting.
                   onClick={resultInstalled ? collect : autoPull}
                 >
-                  {showResult && !resultInstalled ? "↻ FREE SPIN" : "COLLECT ⏎"}
+                  {showResult && !resultInstalled ? "FREE SPIN" : "COLLECT"}
                 </button>
               )}
             </div>

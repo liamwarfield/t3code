@@ -390,66 +390,46 @@ export function slotQuip(outcome: SlotOutcome, installed: boolean): string {
   const { provider, model, effort, tier, quipSeed: seed } = outcome;
   if (outcome.jester)
     return choose(seed, [
-      "Confidently wrong at a 1M context window. Payout hallucinated; actual value may vary.",
-      "The court jester takes the wheel. Honk honk. Your payout was halved for safety reasons.",
-      "Benchmarks said jackpot. Vibes said no. The jester keeps half.",
-      "Gemini read your whole repo and still paid you the wrong amount.",
+      "Confidently wrong at a 1M context window.",
+      "Gemini read your whole repo and still paid the wrong amount.",
+      "Benchmarks said jackpot. The jester keeps half.",
     ]);
   if (installed && outcome.sponsored)
     return choose(seed, [
-      "This pull was brought to you by Anthropic. (It wasn't. Probably.) Results not typical.",
-      "Paid placement. The odds were adjusted for your convenience. #ad",
-      "Fable 5.2 at High. The house insists you try it. Benchmark run by vendor.",
+      "Brought to you by Anthropic. (It wasn't. Probably.)",
+      "Paid placement. Results not typical.",
+      "Benchmark run by vendor.",
     ]);
-  if (!installed)
-    return `${provider.displayName} isn't set up here. The house comps you a free spin.`;
-  if (outcome.agi)
-    return `AGI achieved internally. You get ${model.name} at ${effort.label}, which is the closest thing anyone actually ships.`;
-  if (outcome.benchmaxxed)
-    return `${model.name} at ${effort.label}. Initial results were not reproducible. Payout corrected.`;
+  if (!installed) return `${provider.displayName} isn't set up here. Next pull is on the house.`;
+  if (outcome.agi) return `AGI achieved internally. You get ${model.name}.`;
+  if (outcome.benchmaxxed) return "Initial results were not reproducible.";
   if (outcome.nearMissReel === 2 && outcome.teaseEffort)
-    return `${outcome.teaseEffort.label} was one row away. Just one more.`;
+    return `${outcome.teaseEffort.label} was one row away.`;
   if (outcome.nearMissReel === 1 && outcome.teaseModel)
-    return `${outcome.teaseModel.name} was one row away. The reel chose violence.`;
-  if (provider.driverKind === "grok")
-    return choose(seed, [
-      "Grok. Your diffs now ship with a side of edge.",
-      "Grok. It wrote the code and then posted about it.",
-    ]);
+    return `${outcome.teaseModel.name} was one row away.`;
+  if (provider.driverKind === "grok") return "It wrote the code, then posted about it.";
   if (provider.driverKind === "cursor")
     return model.slug === "auto"
-      ? "Auto. You gambled on a model that gambles on a model."
-      : "Cursor. Pricing changed twice while the reels were spinning.";
-  if (provider.driverKind === "acpRegistry")
-    return "A mystery agent from the registry. Probably a wrapper. Probably fine.";
-  if (provider.driverKind === "pi") return "Pi. A truly irrational choice.";
-  if (provider.driverKind === "opencode") return "OpenCode. Open weights, open wallet.";
+      ? "A model that picks a model. Bold."
+      : "Pricing changed twice while the reels spun.";
+  if (provider.driverKind === "acpRegistry") return "Probably a wrapper. Probably fine.";
+  if (provider.driverKind === "pi") return "A truly irrational choice.";
+  if (provider.driverKind === "opencode") return "Open weights, open wallet.";
   if (provider.driverKind === "muse" || provider.driverKind === "fx")
-    return `${provider.displayName}? Indie darling. You'll be first to tweet about it.`;
+    return "Indie darling. You'll be first to tweet about it.";
   if (tier === "jackpot")
     return provider.driverKind === "claudeAgent"
-      ? `${model.name} at ${effort.label}. Somewhere, your usage limit felt a disturbance.`
-      : `${model.name} at ${effort.label}. Compute credits arriving "in the coming weeks".`;
+      ? `${model.name} at ${effort.label}. Your usage limit felt a disturbance.`
+      : `${model.name} at ${effort.label}. Credits arriving in the coming weeks.`;
   if (tier === "mega")
-    return choose(seed, [
-      "Mega win. The benchmarks fear you.",
-      "Mega win. Someone at the lab is going to nerf this.",
-    ]);
+    return choose(seed, ["The benchmarks fear you.", "Someone at the lab will nerf this."]);
   if (tier === "big")
     return choose(seed, [
-      "Big win. That's a real model, with real thinking.",
-      "Big win. Ship it before the rate limit notices.",
+      "Ship it before the rate limit notices.",
+      "A real model, with real thinking.",
     ]);
-  if (tier === "win")
-    return choose(seed, [
-      "You won 40K tokens! (You paid 100K.) Congratulations.",
-      "Solid pull. Mid, but the good kind of mid.",
-    ]);
-  return choose(seed, [
-    "Certified slop. Ship it anyway.",
-    "Slop detected. The vibes were off.",
-    "Skill issue. Pull again.",
-  ]);
+  if (tier === "win") return "You won 40K. You paid 100K.";
+  return choose(seed, ["Certified slop. Ship it anyway.", "Skill issue. Pull again."]);
 }
 
 /** A rubber stamp slammed across the reels: the visual punchline for the outcome. */

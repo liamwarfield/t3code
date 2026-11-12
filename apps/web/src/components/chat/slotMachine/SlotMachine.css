@@ -151,11 +151,6 @@
   -webkit-background-clip: text;
   background-clip: text;
 }
-[data-slot-title-sub] {
-  font-size: 11px;
-  color: rgb(255 244 220 / 0.6);
-  font-style: italic;
-}
 
 [data-slot-jester-hat] {
   position: absolute;
@@ -1698,34 +1693,6 @@
     filter: none;
   }
 }
-[data-slot-perks] {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  flex-shrink: 0;
-  max-width: 190px;
-}
-[data-slot-perk] {
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 800;
-  color: #1c1310;
-  background: color-mix(in srgb, var(--rarity) 35%, #fff);
-  box-shadow: 0 0 0 1px var(--rarity);
-  white-space: nowrap;
-  animation: slot-perk 380ms cubic-bezier(0.2, 1.8, 0.4, 1) 1 both;
-}
-@keyframes slot-perk {
-  0% {
-    opacity: 0;
-    transform: translateX(40px) scale(0.6);
-  }
-  100% {
-    opacity: 1;
-    transform: none;
-  }
-}
 /* The payout figure lifts off the card and flies up into the TOKENS meter. */
 [data-slot-float] {
   position: absolute;
@@ -1816,13 +1783,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-}
-[data-slot-perks] {
-  max-width: 170px;
-}
-[data-slot-perk] {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 /* The payout figure leaves from the card's left edge and arcs clear of the centred headline. */
 [data-slot-float] {
@@ -1925,16 +1885,6 @@
 }
 
 /* Perks get their own full-width row under the payout, wrapping instead of clipping. */
-[data-slot-loot-text] [data-slot-perks] {
-  flex-direction: row;
-  flex-wrap: wrap;
-  max-width: none;
-  margin-top: 2px;
-}
-[data-slot-loot-text] [data-slot-perk] {
-  font-size: 11px;
-  white-space: normal;
-}
 [data-slot-stage][data-palette="jester"] [data-slot-quip] {
   padding: 2px 8px;
   border-radius: 6px;
@@ -2089,10 +2039,6 @@
 }
 
 /* Readable jokes: the marquee line, kicker and meter labels carry punchlines too. */
-[data-slot-title-sub] {
-  font-size: 13px;
-  color: rgb(255 244 220 / 0.85);
-}
 [data-slot-title-kicker] {
   font-size: 12px;
 }
@@ -2526,4 +2472,15 @@
 /* Broken out, the takeover fully covers the reels so nothing ghosts behind the number. */
 [data-slot-giant][data-slot-broken-out] {
   background: radial-gradient(ellipse at 50% 40%, rgb(60 30 0 / 0.9), rgb(0 0 0 / 0.98) 75%);
+}
+[data-slot-button] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+[data-slot-button] > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
