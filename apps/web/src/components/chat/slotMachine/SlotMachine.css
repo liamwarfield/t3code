@@ -1685,7 +1685,7 @@
     filter: brightness(3);
   }
   60% {
-    transform: scale(1.08) rotate(1deg);
+    transform: scale(1.03) rotate(0.5deg);
     filter: brightness(1.4);
   }
   100% {
